@@ -7,6 +7,7 @@ fiona
 GDAL<=3.11.3
 geoalchemy2
 geopandas
+graphql-core
 netCDF4
 numpy==2.0.1
 opensearch-dsl
