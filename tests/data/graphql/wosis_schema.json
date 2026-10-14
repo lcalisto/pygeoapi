@@ -1,0 +1,2850 @@
+{
+  "data": {
+    "__schema": {
+      "queryType": {
+        "name": "Query",
+        "kind": "OBJECT"
+      },
+      "mutationType": null,
+      "subscriptionType": null,
+      "types": [
+        {
+          "kind": "OBJECT",
+          "name": "Query",
+          "fields": [
+            {
+              "name": "wosisLatestObservations",
+              "args": [
+                {
+                  "name": "first",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "offset",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "orderBy",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "name": null,
+                      "kind": "NON_NULL",
+                      "ofType": {
+                        "name": "WosisLatestObservationsOrderBy",
+                        "kind": "ENUM",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "condition",
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "WosisLatestObservationCondition",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "filter",
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "WosisLatestObservationFilter",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "WosisLatestObservation",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "wosisLatestProfiles",
+              "args": [
+                {
+                  "name": "first",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "offset",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "orderBy",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "name": null,
+                      "kind": "NON_NULL",
+                      "ofType": {
+                        "name": "WosisLatestProfilesOrderBy",
+                        "kind": "ENUM",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "condition",
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "WosisLatestProfileCondition",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "filter",
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "WosisLatestProfileFilter",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "WosisLatestProfile",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Int",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "String",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Boolean",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "WosisLatestProfile",
+          "fields": [
+            {
+              "name": "profileId",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "profileCode",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "geom",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "GeometryPoint",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "countryName",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "longitude",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "latitude",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "GeometryPoint",
+          "fields": [
+            {
+              "name": "geojson",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "srid",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "name": "Int",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "x",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "name": "Float",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "y",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "name": "Float",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [
+            {
+              "kind": "INTERFACE",
+              "name": "GeometryInterface",
+              "ofType": null
+            },
+            {
+              "kind": "INTERFACE",
+              "name": "GeometryGeometry",
+              "ofType": null
+            }
+          ],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INTERFACE",
+          "name": "GeometryInterface",
+          "fields": [
+            {
+              "name": "geojson",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "srid",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "name": "Int",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "GeometryPoint",
+              "ofType": null
+            }
+          ]
+        },
+        {
+          "kind": "SCALAR",
+          "name": "GeoJSON",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INTERFACE",
+          "name": "GeometryGeometry",
+          "fields": [
+            {
+              "name": "geojson",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "srid",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "name": "Int",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "GeometryPoint",
+              "ofType": null
+            }
+          ]
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Float",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "ENUM",
+          "name": "WosisLatestProfilesOrderBy",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "NATURAL",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROFILE_ID_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROFILE_ID_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROFILE_CODE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROFILE_CODE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "DATASET_CODE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "DATASET_CODE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "YEAR_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "YEAR_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "MONTH_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "MONTH_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "DAY_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "DAY_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "SITE_ID_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "SITE_ID_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "GEOM_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "GEOM_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "POSITIONAL_UNCERTAINTY_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "POSITIONAL_UNCERTAINTY_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "COUNTRY_NAME_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "COUNTRY_NAME_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "REGION_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "REGION_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "CONTINENT_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "CONTINENT_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LONGITUDE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LONGITUDE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LATITUDE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LATITUDE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_REFERENCE_SOIL_GROUP_CODE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_REFERENCE_SOIL_GROUP_CODE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_REFERENCE_SOIL_GROUP_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_REFERENCE_SOIL_GROUP_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_PREFIX_QUALIFIERS_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_PREFIX_QUALIFIERS_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_SUFFIX_QUALIFIERS_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_SUFFIX_QUALIFIERS_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_PRINCIPAL_QUALIFIERS_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_PRINCIPAL_QUALIFIERS_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_SUPPLEMENTARY_QUALIFIERS_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_SUPPLEMENTARY_QUALIFIERS_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_PUBLICATION_YEAR_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WRB_PUBLICATION_YEAR_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_MAJOR_GROUP_CODE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_MAJOR_GROUP_CODE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_MAJOR_GROUP_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_MAJOR_GROUP_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_SOIL_UNIT_CODE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_SOIL_UNIT_CODE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_SOIL_UNIT_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_SOIL_UNIT_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_PUBLICATION_YEAR_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FAO_PUBLICATION_YEAR_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_ORDER_NAME_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_ORDER_NAME_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_SUBORDER_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_SUBORDER_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_SUBGROUP_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_SUBGROUP_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_GREAT_GROUP_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_GREAT_GROUP_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_PUBLICATION_YEAR_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "USDA_PUBLICATION_YEAR_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__SITE_ID_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__SITE_ID_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__GEOM_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__GEOM_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__LONGITUDE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__LONGITUDE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__LATITUDE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__LATITUDE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__POSITIONAL_UNCERTAINTY_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__POSITIONAL_UNCERTAINTY_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__COUNTRY_NAME_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__COUNTRY_NAME_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__REGION_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__REGION_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__CONTINENT_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_SITE_BY_SITE_ID__CONTINENT_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_LAYERS_BY_PROFILE_ID__COUNT_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WOSIS_LATEST_LAYERS_BY_PROFILE_ID__COUNT_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "WosisLatestProfileCondition",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "profileId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "profileCode",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "datasetCode",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "year",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "month",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "day",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "siteId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "geom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "positionalUncertainty",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "countryName",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "region",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "continent",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "longitude",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "latitude",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "wrbReferenceSoilGroupCode",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "wrbReferenceSoilGroup",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "wrbPrefixQualifiers",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "wrbSuffixQualifiers",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "wrbPrincipalQualifiers",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "wrbSupplementaryQualifiers",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "wrbPublicationYear",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "faoMajorGroupCode",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "faoMajorGroup",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "faoSoilUnitCode",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "faoSoilUnit",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "faoPublicationYear",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "usdaOrderName",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "usdaSuborder",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "usdaSubgroup",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "usdaGreatGroup",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "usdaPublicationYear",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "WosisLatestProfileFilter",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "profileId",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "IntFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "profileCode",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "StringFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "geom",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GeometryPointFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "countryName",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "StringFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "longitude",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "FloatFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "latitude",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "FloatFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "and",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "WosisLatestProfileFilter",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "or",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "WosisLatestProfileFilter",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "not",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "WosisLatestProfileFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "IntFilter",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "isNull",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "equalTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "distinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notDistinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "in",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Int",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notIn",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Int",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "StringFilter",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "isNull",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "equalTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "distinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notDistinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "in",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "String",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notIn",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "String",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "includes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notIncludes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "includesInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notIncludesInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "startsWith",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notStartsWith",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "startsWithInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notStartsWithInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "endsWith",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEndsWith",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "endsWithInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEndsWithInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "like",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notLike",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "likeInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notLikeInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "equalToInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEqualToInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "distinctFromInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notDistinctFromInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "inInsensitive",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "String",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notInInsensitive",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "String",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThanInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThanOrEqualToInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThanInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThanOrEqualToInsensitive",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "GeometryPointFilter",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "bboxAbove",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxBelow",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxContains",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxEquals",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxIntersects2D",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxIntersectsND",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxLeftOf",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxOverlapsOrAbove",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxOverlapsOrBelow",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxOverlapsOrLeftOf",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxOverlapsOrRightOf",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bboxRightOf",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "contains",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "containsProperly",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "coveredBy",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "covers",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "crosses",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "disjoint",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "equals",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "exactlyEquals",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "intersects",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "intersects3D",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "orderingEquals",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "overlaps",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "touches",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "within",
+              "type": {
+                "kind": "SCALAR",
+                "name": "GeoJSON",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "FloatFilter",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "isNull",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "equalTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "distinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notDistinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "in",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Float",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notIn",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Float",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "BigFloat",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "WosisLatestObservation",
+          "fields": [
+            {
+              "name": "code",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "property",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "procedure",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "unit",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "profiles",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "layers",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accuracy",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "BigInt",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "ENUM",
+          "name": "WosisLatestObservationsOrderBy",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "NATURAL",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "CODE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "CODE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROPERTY_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROPERTY_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROCEDURE_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROCEDURE_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "UNIT_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "UNIT_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROFILES_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PROFILES_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LAYERS_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LAYERS_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "ACCURACY_ASC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "ACCURACY_DESC",
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "WosisLatestObservationCondition",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "code",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "property",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "procedure",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "unit",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "profiles",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "layers",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "accuracy",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "WosisLatestObservationFilter",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "code",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "StringFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "property",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "StringFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "procedure",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "StringFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "unit",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "StringFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "profiles",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "BigIntFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "layers",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "BigIntFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "accuracy",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "BigFloatFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "and",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "WosisLatestObservationFilter",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "or",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "WosisLatestObservationFilter",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "not",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "WosisLatestObservationFilter",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "BigIntFilter",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "isNull",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "equalTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "distinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notDistinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "in",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "BigInt",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notIn",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "BigInt",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigInt",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "BigFloatFilter",
+          "fields": null,
+          "inputFields": [
+            {
+              "name": "isNull",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "equalTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "distinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notDistinctFrom",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "in",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "BigFloat",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notIn",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "BigFloat",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lessThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThan",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "greaterThanOrEqualTo",
+              "type": {
+                "kind": "SCALAR",
+                "name": "BigFloat",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        }
+      ],
+      "directives": [
+        {
+          "name": "include",
+          "locations": [
+            "FIELD",
+            "FRAGMENT_SPREAD",
+            "INLINE_FRAGMENT"
+          ],
+          "args": [
+            {
+              "name": "if",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "name": "Boolean",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ]
+        },
+        {
+          "name": "skip",
+          "locations": [
+            "FIELD",
+            "FRAGMENT_SPREAD",
+            "INLINE_FRAGMENT"
+          ],
+          "args": [
+            {
+              "name": "if",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "name": "Boolean",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ]
+        },
+        {
+          "name": "deprecated",
+          "locations": [
+            "FIELD_DEFINITION",
+            "ARGUMENT_DEFINITION",
+            "INPUT_FIELD_DEFINITION",
+            "ENUM_VALUE"
+          ],
+          "args": [
+            {
+              "name": "reason",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": "\"No longer supported\""
+            }
+          ]
+        },
+        {
+          "name": "specifiedBy",
+          "locations": [
+            "SCALAR"
+          ],
+          "args": [
+            {
+              "name": "url",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "name": "String",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

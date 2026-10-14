@@ -111,3 +111,10 @@ This directory provides test data to demonstrate functionality.
 - source: Dutch National Georegister
 - URL: https://nationaalgeoregister.nl
 - License: CC0: https://creativecommons.org/share-your-work/public-domain/cc0
+
+### `graphql/wosis_schema.json`
+- source: WoSIS (World Soil Information Service), ISRIC - World Soil Information
+- URL: https://graphql.isric.org/wosis/graphql
+- License: CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+- Notes
+  - GraphQL introspection reply recorded 2026-10-13, reduced to the types the provider tests need (schema structure only, it holds no soil data)
