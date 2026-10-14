@@ -112,9 +112,10 @@ This directory provides test data to demonstrate functionality.
 - URL: https://nationaalgeoregister.nl
 - License: CC0: https://creativecommons.org/share-your-work/public-domain/cc0
 
-### `graphql/wosis_schema.json`
+### `graphql/wosis_*.json`
 - source: WoSIS (World Soil Information Service), ISRIC - World Soil Information
 - URL: https://graphql.isric.org/wosis/graphql
 - License: CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
 - Notes
-  - GraphQL introspection reply recorded 2026-10-13, reduced to the types the provider tests need (schema structure only, it holds no soil data)
+  - `wosis_schema.json`: GraphQL introspection reply recorded 2026-10-13, reduced to the types the provider tests need (schema structure only, it holds no soil data)
+  - `wosis_interactions.json`: provider requests with replies recorded 2026-10-14; holds a few `wosis_latest` profile records (ids, codes, country names, coordinates)

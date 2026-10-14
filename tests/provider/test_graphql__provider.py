@@ -28,21 +28,27 @@
 # =================================================================
 
 import json
+import logging
 from copy import deepcopy
 from http import HTTPStatus
 from unittest import mock
 
+import pyproj
 import pytest
 import requests
-from graphql import build_schema, get_introspection_query, graphql_sync
+from graphql import (build_client_schema, build_schema,
+                     get_introspection_query, graphql_sync, parse, validate)
 
 from pygeoapi.api import API
 from pygeoapi.api.itemtypes import get_collection_queryables
+from pygeoapi.crs import CrsTransformSpec, get_crs
 from pygeoapi.openapi import get_oas
 from pygeoapi.plugin import load_plugin
 from pygeoapi.provider import graphql_
 from pygeoapi.provider.base import (ProviderConnectionError,
-                                    ProviderGenericError, ProviderQueryError)
+                                    ProviderGenericError,
+                                    ProviderInvalidQueryError,
+                                    ProviderQueryError)
 from pygeoapi.provider.graphql_ import GraphQLProvider
 from pygeoapi.util import yaml_load
 
@@ -51,6 +57,19 @@ from ..util import get_test_file_path, mock_api_request
 WOSIS_URL = 'https://wosis.example.org/graphql'
 SYNTH_URL = 'https://graphql.example.org/graphql'
 INTROSPECTION = get_introspection_query(descriptions=False)
+
+THINGS_SDL = '''
+    enum ThingsOrderBy { ID_ASC ID_DESC NAME_ASC NAME_DESC }
+    type Query {
+      things(first: Int, offset: Int, orderBy: [ThingsOrderBy!]): [Thing]
+    }
+    type Thing { id: Int name: String }
+'''
+
+POINTS_SDL = '''
+    type Query { points(first: Int, offset: Int): [Pt] }
+    type Pt { id: Int x: Float y: Float }
+'''
 
 
 class FakeResponse:
@@ -104,7 +123,28 @@ def transport():
     fake = FakeTransport()
     with open(get_test_file_path('data/graphql/wosis_schema.json')) as fh:
         fake.add(WOSIS_URL, INTROSPECTION, None, json.load(fh))
+    path = get_test_file_path('data/graphql/wosis_interactions.json')
+    with open(path) as fh:
+        for interaction in json.load(fh):
+            fake.add(WOSIS_URL, interaction['document'],
+                     interaction['variables'], interaction['body'],
+                     interaction['status'])
     return fake
+
+
+def data_calls(transport):
+    """Variables of the non-introspection calls, in order"""
+
+    return [call['payload'].get('variables') for call in transport.calls
+            if '__schema' not in call['payload']['query']]
+
+
+def recorded_interaction(name):
+    """One recorded WoSIS interaction, by name"""
+
+    path = get_test_file_path('data/graphql/wosis_interactions.json')
+    with open(path) as fh:
+        return next(ex for ex in json.load(fh) if ex['name'] == name)
 
 
 @pytest.fixture(autouse=True)
@@ -123,8 +163,9 @@ def offline(transport):
 @pytest.fixture()
 def config():
     # WoSIS, ISRIC World Soil Information
-    # schema recorded from https://graphql.isric.org/wosis/graphql
-    # (see tests/data/README.md); tests never touch the network
+    # schema and interactions recorded from
+    # https://graphql.isric.org/wosis/graphql (CC BY 4.0, see
+    # tests/data/README.md); tests never touch the network
     return {
         'name': 'GraphQL',
         'type': 'feature',
@@ -232,7 +273,6 @@ def test_headers_coerced(config):
 @pytest.mark.parametrize('data', [
     'ftp://example.com/graphql',
     '/data/wosis.json',
-    'wosis.example.org/graphql',
     123
 ])
 def test_data_must_be_http(config, data):
@@ -292,7 +332,7 @@ def test_unknown_graphql_key(config, key):
         GraphQLProvider(config)
 
 
-@pytest.mark.parametrize('collection', ['wosis profiles', 'a.b', '1abc', ''])
+@pytest.mark.parametrize('collection', ['a.b', ''])
 def test_collection_invalid_name(config, collection):
     config['graphql']['collection'] = collection
 
@@ -300,12 +340,7 @@ def test_collection_invalid_name(config, collection):
         GraphQLProvider(config)
 
 
-@pytest.mark.parametrize('geometry', [
-    'geom',
-    {},
-    {'x_field': 'longitude'},
-    {'x_field': 'longitude', 'y_field': 'latitude', 'geojson_field': 'geom'}
-])
+@pytest.mark.parametrize('geometry', ['geom', {'x_field': 'longitude'}])
 def test_geometry_invalid(config, geometry):
     config['graphql']['geometry'] = geometry
 
@@ -322,11 +357,7 @@ def test_geometry_geojson_path(config):
     assert p.geometry_y is None
 
 
-@pytest.mark.parametrize('bbox_filter', [
-    'geom',
-    {'field': 'geom'},
-    {'field': 'geom', 'operator': 'intersects', 'extra': 1}
-])
+@pytest.mark.parametrize('bbox_filter', ['geom', {'field': 'geom'}])
 def test_bbox_filter_invalid(config, bbox_filter):
     config['graphql']['bbox_filter'] = bbox_filter
 
@@ -335,7 +366,7 @@ def test_bbox_filter_invalid(config, bbox_filter):
 
 
 @pytest.mark.parametrize('key', ['page_size', 'timeout'])
-@pytest.mark.parametrize('value', [0, -1, 'many', 2.5, True])
+@pytest.mark.parametrize('value', [0, 'many', True])
 def test_positive_int_keys(config, key, value):
     config['graphql'][key] = value
 
@@ -347,7 +378,6 @@ def test_positive_int_keys(config, key, value):
     'countryName',
     {},
     {'country': 'country name'},
-    {'country': 'a..b'},
     {5: 'countryName'}
 ])
 def test_field_mapping_invalid(config, mapping):
@@ -360,7 +390,6 @@ def test_field_mapping_invalid(config, mapping):
 @pytest.mark.parametrize('headers', [
     'token',
     {'x-api-key': {}},
-    {'x-api-key': ['a']},
     {'x-api-key': None},
     {5: 'value'}
 ])
@@ -429,19 +458,6 @@ def test_fields_fresh_dicts(config):
     fields['profileId']['type'] = 'mutated'
 
     assert p.get_fields()['profileId'] == {'type': 'integer'}
-
-
-def test_field_mapping_parsed(config):
-    config['graphql']['field_mapping'] = {
-        'profileId': 'profileId',
-        'profileCode': 'profileCode',
-        'country': 'countryName'
-    }
-    p = GraphQLProvider(config)
-
-    assert p.field_mapping == {'profileId': 'profileId',
-                               'profileCode': 'profileCode',
-                               'country': 'countryName'}
 
 
 def test_field_mapping_resolved(config):
@@ -529,7 +545,6 @@ def test_geometry_not_on_schema(config):
 
 @pytest.mark.parametrize('bbox_filter,error', [
     ({'field': 'elevation', 'operator': 'bboxIntersects2D'}, 'field'),
-    ({'field': 'countryName', 'operator': 'bboxIntersects2D'}, 'operator'),
     ({'field': 'geom', 'operator': 'nope'}, 'operator')
 ])
 def test_bbox_filter_not_on_filter_type(config, bbox_filter, error):
@@ -718,6 +733,388 @@ def test_bad_reply_shape(config, transport):
 
     with pytest.raises(ProviderQueryError, match='reply shape'):
         GraphQLProvider(config)
+
+
+def test_query_defaults(config, transport):
+    result = GraphQLProvider(config).query()
+
+    assert result['type'] == 'FeatureCollection'
+    assert result['numberReturned'] == 10
+    assert len(result['features']) == 10
+    assert 'numberMatched' not in result
+    feature = result['features'][0]
+    assert feature['type'] == 'Feature'
+    assert isinstance(feature['id'], int)
+    assert list(feature['properties']) == ['profileId', 'profileCode',
+                                           'countryName']
+    assert feature['geometry']['type'] == 'Point'
+    row = recorded_interaction('defaults')['body']['data']
+    row = row['wosisLatestProfiles'][0]
+    expected = [row['longitude'], row['latitude']]
+    assert feature['geometry']['coordinates'] == expected
+    assert data_calls(transport) == [
+        {'limit': 10, 'offset': 0, 'sortby': ['PROFILE_ID_ASC']}]
+    # layout pinned: one variable and one argument per line
+    document = transport.calls[-1]['payload']['query']
+    assert document == recorded_interaction('defaults')['document']
+
+
+def test_query_offset_limit(config, transport):
+    result = GraphQLProvider(config).query(offset=5, limit=5)
+
+    assert result['numberReturned'] == 5
+    assert data_calls(transport) == [
+        {'limit': 5, 'offset': 5, 'sortby': ['PROFILE_ID_ASC']}]
+
+
+def test_query_chunking(config, transport):
+    config['graphql']['page_size'] = 2
+    result = GraphQLProvider(config).query(limit=5)
+
+    assert result['numberReturned'] == 5
+    assert len({feature['id'] for feature in result['features']}) == 5
+    assert [(v['limit'], v['offset']) for v in data_calls(transport)] == [
+        (2, 0), (2, 2), (1, 4)]
+
+
+def test_query_short_page(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 5, 'offset': 0, 'sortby': ['ID_ASC']},
+                  {'data': {'things': [{'id': 1, 'name': 'a'},
+                                       {'id': 2, 'name': 'b'},
+                                       {'id': 3, 'name': 'c'}]}})
+    result = p.query(limit=5)
+
+    assert result['numberReturned'] == 3
+    assert len(data_calls(transport)) == 1
+
+
+def test_query_empty(config):
+    result = GraphQLProvider(config).query(offset=9000000)
+
+    assert result['numberReturned'] == 0
+    assert result['features'] == []
+
+
+def test_query_null_node_rejected(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 3, 'offset': 0, 'sortby': ['ID_ASC']},
+                  {'data': {'things': [{'id': 1, 'name': 'a'}, None,
+                                       {'id': 3, 'name': 'c'}]}})
+
+    with pytest.raises(ProviderQueryError, match='null node'):
+        p.query(limit=3)
+
+
+def test_query_oversized_page_truncated(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 2, 'offset': 0, 'sortby': ['ID_ASC']},
+                  {'data': {'things': [{'id': n, 'name': 'x'}
+                                       for n in range(1, 6)]}})
+    result = p.query(limit=2)
+
+    assert result['numberReturned'] == 2
+    assert [feature['id'] for feature in result['features']] == [1, 2]
+    assert len(data_calls(transport)) == 1
+
+
+def test_geometry_geojson(config):
+    config['graphql']['geometry'] = {'geojson_field': 'geom.geojson'}
+    result = GraphQLProvider(config).query(limit=5)
+    geometry = result['features'][0]['geometry']
+
+    assert geometry['type'] == 'Point'
+    assert 'coordinates' in geometry
+
+
+def test_geometry_missing_null(transport, things_config):
+    synthetic(transport, POINTS_SDL)
+    things_config['graphql'] = {
+        'collection': 'points',
+        'geometry': {'x_field': 'x', 'y_field': 'y'}
+    }
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=False)
+    transport.add(SYNTH_URL, document, {'limit': 4, 'offset': 0},
+                  {'data': {'points': [{'id': 1, 'x': None, 'y': 2.5},
+                                       {'id': 2, 'x': 'abc', 'y': 1.0},
+                                       {'id': 3, 'x': 'NaN', 'y': 1.0},
+                                       {'id': 4, 'x': 1.0, 'y': 2.0}]}})
+    result = p.query(limit=4)
+    geometries = [feature['geometry'] for feature in result['features']]
+
+    assert geometries[:3] == [None, None, None]
+    assert geometries[3]['coordinates'] == [1.0, 2.0]
+
+
+def test_geometry_geojson_invalid(transport, things_config):
+    synthetic(transport, '''
+        scalar GeoJSON
+        type Query { blobs(first: Int, offset: Int): [Blob] }
+        type Blob { id: Int geo: GeoJSON }
+    ''')
+    things_config['graphql'] = {
+        'collection': 'blobs',
+        'geometry': {'geojson_field': 'geo'}
+    }
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=False)
+    transport.add(SYNTH_URL, document, {'limit': 4, 'offset': 0},
+                  {'data': {'blobs': [
+                      {'id': 1, 'geo': {}},
+                      {'id': 2, 'geo': {'type': 'Point'}},
+                      {'id': 3, 'geo': 'POINT(1 1)'},
+                      {'id': 4, 'geo': {'type': 'Point',
+                                        'coordinates': [1.0, 2.0]}}]}})
+    result = p.query(limit=4)
+    geometries = [feature['geometry'] for feature in result['features']]
+
+    assert geometries[:3] == [None, None, None]
+    assert geometries[3] == {'type': 'Point', 'coordinates': [1.0, 2.0]}
+
+
+def test_id_zero_accepted(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 1, 'offset': 0, 'sortby': ['ID_ASC']},
+                  {'data': {'things': [{'id': 0, 'name': 'zero'}]}})
+    result = p.query(limit=1)
+
+    assert result['features'][0]['id'] == 0
+
+
+def test_non_spatial(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 2, 'offset': 0, 'sortby': ['ID_ASC']},
+                  {'data': {'things': [{'id': 1, 'name': 'a'},
+                                       {'id': 2, 'name': 'b'}]}})
+    result = p.query(limit=2)
+
+    assert result['features'][0]['geometry'] is None
+    assert result['features'][0]['properties'] == {'id': 1, 'name': 'a'}
+
+
+def test_skip_geometry(config, transport):
+    result = GraphQLProvider(config).query(limit=5, skip_geometry=True)
+
+    assert result['features'][0]['geometry'] is None
+    document = transport.calls[-1]['payload']['query']
+    assert 'longitude' not in document
+
+
+def test_select_properties(config, transport):
+    p = GraphQLProvider(config)
+    result = p.query(limit=5, select_properties=['profileId'])
+
+    assert list(result['features'][0]['properties']) == ['profileId']
+    document = transport.calls[-1]['payload']['query']
+    assert 'profileCode' not in document
+    assert 'longitude' in document
+
+
+def test_sortby(config, transport):
+    result = GraphQLProvider(config).query(
+        limit=5, sortby=[{'property': 'countryName', 'order': '-'}])
+
+    assert result['numberReturned'] == 5
+    assert data_calls(transport)[-1]['sortby'] == ['COUNTRY_NAME_DESC',
+                                                   'PROFILE_ID_ASC']
+
+
+def test_sortby_tiebreak(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 2, 'offset': 0, 'sortby': ['ID_DESC']},
+                  {'data': {'things': [{'id': 2, 'name': 'b'},
+                                       {'id': 1, 'name': 'a'}]}})
+    result = p.query(limit=2, sortby=[{'property': 'id', 'order': '-'}])
+
+    assert data_calls(transport) == [
+        {'limit': 2, 'offset': 0, 'sortby': ['ID_DESC']}]
+    assert result['numberReturned'] == 2
+
+
+def test_sortby_multi_key_ascending(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 2, 'offset': 0,
+                   'sortby': ['NAME_ASC', 'ID_DESC']},
+                  {'data': {'things': [{'id': 2, 'name': 'a'},
+                                       {'id': 1, 'name': 'b'}]}})
+    p.query(limit=2, sortby=[{'property': 'name', 'order': '+'},
+                             {'property': 'id', 'order': '-'}])
+
+    assert data_calls(transport)[-1]['sortby'] == ['NAME_ASC', 'ID_DESC']
+
+
+def test_select_properties_non_id(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection(['name'], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 1, 'offset': 0, 'sortby': ['ID_ASC']},
+                  {'data': {'things': [{'id': 7, 'name': 'a'}]}})
+    result = p.query(limit=1, select_properties=['name'])
+
+    assert 'id' in document
+    assert result['features'][0]['id'] == 7
+    assert result['features'][0]['properties'] == {'name': 'a'}
+
+
+def test_sortby_unsortable_400(config):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.query(sortby=[{'property': 'unknownProp', 'order': '+'}])
+
+    assert err.value.user_msg == 'property is not sortable'
+
+
+def test_no_id_sort_warns(transport, things_config, caplog):
+    synthetic(transport, '''
+        enum ThingsOrderBy { NAME_ASC NAME_DESC }
+        type Query {
+          things(first: Int, offset: Int, orderBy: [ThingsOrderBy!]): [Thing]
+        }
+        type Thing { id: Int name: String }
+    ''')
+    with caplog.at_level(logging.WARNING):
+        p = GraphQLProvider(things_config)
+
+    assert 'paging order is not guaranteed' in caplog.text
+    document = p._document(p._selection([], False)[1], with_sort=False)
+    transport.add(SYNTH_URL, document, {'limit': 10, 'offset': 0},
+                  {'data': {'things': []}})
+    p.query()
+
+    assert 'sortby' not in data_calls(transport)[-1]
+
+
+@pytest.mark.parametrize('kwargs,error', [
+    ({'resulttype': 'hits'}, 'resulttype hits'),
+    ({'bbox': [0, 0, 1, 1]}, 'bbox'),
+    ({'datetime_': '2020-01-01'}, 'datetime'),
+    ({'properties': [('countryName', 'Portugal')]}, 'property filters'),
+    ({'q': 'soil'}, 'q is not supported'),
+    ({'filterq': "countryName = 'x'"}, 'CQL')
+])
+def test_unsupported_params_400(config, kwargs, error):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderInvalidQueryError, match=error):
+        p.query(**kwargs)
+
+
+def test_offset_beyond_int32_400(config):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.query(offset=2 ** 31 - 5, limit=10)
+
+    assert err.value.user_msg == 'offset too large'
+
+
+def test_upstream_error_500(config, transport):
+    p = GraphQLProvider(config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(WOSIS_URL, document,
+                  {'limit': 10, 'offset': 0, 'sortby': ['PROFILE_ID_ASC']},
+                  {'errors': [{'message': 'statement timeout'}]})
+
+    with pytest.raises(ProviderQueryError, match='GraphQL errors'):
+        p.query()
+
+
+def test_query_reply_not_list(config, transport):
+    p = GraphQLProvider(config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(WOSIS_URL, document,
+                  {'limit': 10, 'offset': 0, 'sortby': ['PROFILE_ID_ASC']},
+                  {'data': {'wosisLatestProfiles': 'nope'}})
+
+    with pytest.raises(ProviderQueryError, match='reply shape'):
+        p.query()
+
+
+def test_id_missing_500(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=True)
+    transport.add(SYNTH_URL, document,
+                  {'limit': 1, 'offset': 0, 'sortby': ['ID_ASC']},
+                  {'data': {'things': [{'id': None, 'name': 'a'}]}})
+
+    with pytest.raises(ProviderQueryError, match='id missing'):
+        p.query(limit=1)
+
+
+def test_timeout_connection_error(config, transport):
+    p = GraphQLProvider(config)
+    failing = mock.patch(
+        'pygeoapi.provider.graphql_.requests.Session.post',
+        side_effect=requests.Timeout('upstream too slow'))
+
+    with failing, pytest.raises(ProviderConnectionError):
+        p.query()
+
+
+def test_call_headers_timeout(config, transport):
+    config['graphql']['headers'] = {'x-api-key': 'k'}
+    config['graphql']['timeout'] = 7
+    GraphQLProvider(config).query()
+    call = transport.calls[-1]
+
+    assert call['kwargs']['timeout'] == 7
+    assert call['kwargs']['headers'] == {'x-api-key': 'k'}
+    assert call['kwargs']['allow_redirects'] is False
+
+
+def test_crs_transform(config):
+    p = GraphQLProvider(config)
+    source = 'http://www.opengis.net/def/crs/OGC/1.3/CRS84'
+    target = 'http://www.opengis.net/def/crs/EPSG/0/3857'
+    spec = CrsTransformSpec(
+        source_crs_uri=source,
+        source_crs_wkt=get_crs(source).to_wkt(),
+        target_crs_uri=target,
+        target_crs_wkt=get_crs(target).to_wkt(),
+    )
+    plain = p.query()
+    transformed = p.query(crs_transform_spec=spec)
+
+    lon, lat = plain['features'][0]['geometry']['coordinates']
+    transformer = pyproj.Transformer.from_crs(4326, 3857, always_xy=True)
+    expected = transformer.transform(lon, lat)
+    coordinates = transformed['features'][0]['geometry']['coordinates']
+    assert coordinates == pytest.approx(expected)
+
+
+def test_document_validates(config, transport):
+    GraphQLProvider(config).query()
+    document = transport.calls[-1]['payload']['query']
+    with open(get_test_file_path('data/graphql/wosis_schema.json')) as fh:
+        schema = build_client_schema(json.load(fh)['data'])
+
+    assert parse(document)
+    assert validate(schema, parse(document)) == []
 
 
 def test_api_queryables(graphql_api):

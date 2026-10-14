@@ -29,6 +29,7 @@
 
 import functools
 import logging
+import math
 import re
 from urllib.parse import urlparse
 
@@ -40,12 +41,19 @@ from graphql import (GraphQLError, build_client_schema,
 
 from pygeoapi.crs import crs_transform
 from pygeoapi.provider.base import (BaseProvider, ProviderConnectionError,
-                                    ProviderGenericError, ProviderQueryError)
+                                    ProviderGenericError,
+                                    ProviderInvalidQueryError,
+                                    ProviderQueryError)
 
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PAGE_SIZE = 100
 DEFAULT_TIMEOUT = 30
+
+INT32_MAX = 2 ** 31 - 1
+
+GEOJSON_TYPES = {'Point', 'MultiPoint', 'LineString', 'MultiLineString',
+                 'Polygon', 'MultiPolygon', 'GeometryCollection'}
 
 GRAPHQL_NAME = re.compile(r'[_A-Za-z][_0-9A-Za-z]*')
 
@@ -214,6 +222,97 @@ def _field_schema(type_):
     return dict(TYPE_MAP.get(named.name, {'type': 'string'}))
 
 
+def _order_map(mapping, order_type):
+    """
+    Map property names to orderBy enum value pairs by normalised name;
+    keys come from the mapped GraphQL field, dotted paths are not sortable
+
+    :param mapping: property mapping
+    :param order_type: orderBy GraphQL enum type
+
+    :returns: dict of property name to (asc, desc) enum values
+    """
+
+    asc = {}
+    desc = {}
+    ambiguous = set()
+    for name in order_type.values:
+        if name.endswith('_ASC'):
+            key = name[:-4].replace('_', '').lower()
+            if key in asc:
+                ambiguous.add(key)
+            asc[key] = name
+        elif name.endswith('_DESC'):
+            key = name[:-5].replace('_', '').lower()
+            if key in desc:
+                ambiguous.add(key)
+            desc[key] = name
+
+    pairs = {}
+    for prop, (path, _) in mapping.items():
+        if len(path) != 1:
+            continue
+        key = path[0].replace('_', '').lower()
+        if key in ambiguous:
+            continue
+        if key in asc and key in desc:
+            pairs[prop] = (asc[key], desc[key])
+
+    return pairs
+
+
+def _render_tree(tree, indent):
+    """
+    Render a selection tree as GraphQL lines
+
+    :param tree: nested dict of field names
+    :param indent: leading whitespace
+
+    :returns: list of lines
+    """
+
+    lines = []
+    for name, sub in tree.items():
+        if sub:
+            lines.append(f'{indent}{name} {{')
+            lines += _render_tree(sub, indent + '  ')
+            lines.append(f'{indent}}}')
+        else:
+            lines.append(f'{indent}{name}')
+
+    return lines
+
+
+def _unsupported(msg):
+    """
+    Log and raise an unsupported-parameter error
+
+    :param msg: error text, also sent to the client
+    """
+
+    LOGGER.error(msg)
+    raise ProviderInvalidQueryError(user_msg=msg)
+
+
+def _value_at(node, path):
+    """
+    Value at a field path inside a reply node
+
+    :param node: reply node
+    :param path: field path tuple
+
+    :returns: the value, or None
+    """
+
+    value = node
+    for part in path:
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+
+    return value
+
+
 class GraphQLProvider(BaseProvider):
     """GraphQL provider"""
 
@@ -228,6 +327,7 @@ class GraphQLProvider(BaseProvider):
 
         super().__init__(provider_def)
         self._parse_config(provider_def)
+        self._session = requests.Session()
         self._resolve_schema()
         self.get_fields()
 
@@ -395,6 +495,7 @@ class GraphQLProvider(BaseProvider):
         self._mapping = self._map_fields()
         self._geometry_paths()
         self._check_bbox_filter()
+        self._build_sorting(field)
 
     def _node(self, field):
         """
@@ -429,6 +530,8 @@ class GraphQLProvider(BaseProvider):
         for name in ('first', 'offset'):
             if name not in field.args:
                 _config_error(f'collection must accept {name}')
+        self._limit_decl = str(field.args['first'].type)
+        self._offset_decl = str(field.args['offset'].type)
 
         for name, arg in field.args.items():
             if name in ('filter', 'orderBy'):
@@ -437,9 +540,11 @@ class GraphQLProvider(BaseProvider):
             elif name not in ('first', 'offset') and is_required_argument(arg):
                 _config_error(f'required argument {name} not supported')
 
+        self._filter_decl = None
         if 'filter' in field.args:
             filter_type = get_named_type(field.args['filter'].type)
             if is_input_object_type(filter_type):
+                self._filter_decl = str(field.args['filter'].type)
                 return filter_type
 
         return None
@@ -452,7 +557,7 @@ class GraphQLProvider(BaseProvider):
         """
 
         if self.field_mapping:
-            mapping = {prop: self._leaf(path, f'field_mapping.{prop}')
+            mapping = {prop: self._resolve_path(path, f'field_mapping.{prop}')
                        for prop, path in self.field_mapping.items()}
         else:
             geometry = {self.geometry_x, self.geometry_y,
@@ -481,7 +586,7 @@ class GraphQLProvider(BaseProvider):
 
         return mapping
 
-    def _leaf(self, path, key):
+    def _resolve_path(self, path, key):
         """
         Resolve a dotted path to a scalar leaf on the node type
 
@@ -519,10 +624,12 @@ class GraphQLProvider(BaseProvider):
 
         self._geom_x = self._geom_y = self._geom_geojson = None
         if self.geometry_x:
-            self._geom_x = self._leaf(self.geometry_x, 'geometry.x_field')[0]
-            self._geom_y = self._leaf(self.geometry_y, 'geometry.y_field')[0]
+            self._geom_x = self._resolve_path(
+                self.geometry_x, 'geometry.x_field')[0]
+            self._geom_y = self._resolve_path(
+                self.geometry_y, 'geometry.y_field')[0]
         if self.geometry_geojson:
-            self._geom_geojson = self._leaf(
+            self._geom_geojson = self._resolve_path(
                 self.geometry_geojson, 'geometry.geojson_field')[0]
 
     def _check_bbox_filter(self):
@@ -542,6 +649,221 @@ class GraphQLProvider(BaseProvider):
                 or self.bbox_operator not in operators.fields):
             _config_error(
                 f'bbox_filter operator {self.bbox_operator} not supported')
+
+    def _build_sorting(self, field):
+        """
+        Build the sort map from the orderBy enum
+
+        :param field: collection field on the query type
+        """
+
+        self._sort_map = {}
+        self._order_decl = None
+
+        if 'orderBy' in field.args:
+            arg_type = field.args['orderBy'].type
+            if is_non_null_type(arg_type):
+                arg_type = arg_type.of_type
+            order_type = get_named_type(arg_type)
+            if is_list_type(arg_type) and is_enum_type(order_type):
+                self._order_decl = str(field.args['orderBy'].type)
+                self._sort_map = _order_map(self._mapping, order_type)
+
+        if self.id_field not in self._sort_map:
+            LOGGER.warning(f'no orderBy value for {self.id_field}: '
+                           'paging order is not guaranteed')
+
+    def _selection(self, select_properties, skip_geometry):
+        """
+        Properties to return and field paths to request upstream
+
+        :param select_properties: list of requested property names
+        :param skip_geometry: bool of whether to skip geometry
+
+        :returns: tuple of (property names, field paths)
+        """
+
+        props = [p for p in self._mapping
+                 if not select_properties or p in select_properties]
+
+        paths = [self._mapping[p][0] for p in props]
+        if self.id_field not in props:
+            paths.append(self._mapping[self.id_field][0])
+        if not skip_geometry:
+            for path in (self._geom_x, self._geom_y, self._geom_geojson):
+                if path:
+                    paths.append(path)
+
+        return props, paths
+
+    def _document(self, paths, with_sort, with_filter=False):
+        """
+        Build the GraphQL document, one variable and argument per line
+
+        :param paths: field paths to select
+        :param with_sort: include the orderBy variable
+        :param with_filter: include the filter variable
+
+        :returns: str of GraphQL document
+        """
+
+        variables = [f'$limit: {self._limit_decl}',
+                     f'$offset: {self._offset_decl}']
+        arguments = ['first: $limit', 'offset: $offset']
+        if with_filter:
+            variables.append(f'$filter: {self._filter_decl}')
+            arguments.append('filter: $filter')
+        if with_sort:
+            variables.append(f'$sortby: {self._order_decl}')
+            arguments.append('orderBy: $sortby')
+
+        tree = {}
+        for path in paths:
+            node = tree
+            for part in path:
+                node = node.setdefault(part, {})
+
+        lines = ['query (']
+        lines += [f'  {variable}' for variable in variables]
+        lines += [') {', f'  {self.collection}(']
+        lines += [f'    {argument}' for argument in arguments]
+        lines += ['  ) {']
+        lines += _render_tree(tree, '    ')
+        lines += ['  }', '}']
+
+        return '\n'.join(lines)
+
+    def _order(self, sortby):
+        """
+        Map client sortby to orderBy enum values, id as tiebreaker
+
+        :param sortby: list of dicts (property, order)
+
+        :returns: list of orderBy enum values
+        """
+
+        order = []
+        used = set()
+        for sort in sortby:
+            prop = sort['property']
+            pair = self._sort_map.get(prop)
+            if pair is None:
+                msg = f'property {prop} is not sortable'
+                LOGGER.error(msg)
+                raise ProviderInvalidQueryError(
+                    user_msg='property is not sortable')
+            order.append(pair[0] if sort['order'] == '+' else pair[1])
+            used.add(prop)
+
+        pair = self._sort_map.get(self.id_field)
+        if pair and self.id_field not in used:
+            order.append(pair[0])
+
+        return order
+
+    def _post(self, document, variables):
+        """
+        POST the document and return the collection nodes
+
+        :param document: GraphQL document
+        :param variables: dict of variables
+
+        :returns: list of reply nodes
+        """
+
+        data = _post_graphql(self._session, self.data, self.headers,
+                             self.timeout, document, variables)
+        nodes = data.get(self.collection)
+        if not isinstance(nodes, list):
+            msg = f'Unexpected reply shape from {self.data}'
+            LOGGER.error(msg)
+            raise ProviderQueryError(msg)
+
+        return nodes
+
+    def _feature(self, node, props, skip_geometry):
+        """
+        Build a GeoJSON feature from a reply node
+
+        :param node: reply node
+        :param props: property names to return
+        :param skip_geometry: bool of whether to skip geometry
+
+        :returns: dict of GeoJSON feature
+        """
+
+        id_ = _value_at(node, self._mapping[self.id_field][0])
+        if id_ is None:
+            msg = 'id missing in reply'
+            LOGGER.error(msg)
+            raise ProviderQueryError(msg)
+
+        feature = {'type': 'Feature', 'id': id_, 'geometry': None,
+                   'properties': {}}
+        if not skip_geometry:
+            feature['geometry'] = self._geometry(node)
+        for prop in props:
+            feature['properties'][prop] = _value_at(
+                node, self._mapping[prop][0])
+
+        return feature
+
+    def _geometry(self, node):
+        """
+        Geometry of a reply node
+
+        :param node: reply node
+
+        :returns: dict of GeoJSON geometry, or None
+        """
+
+        if self._geom_geojson:
+            value = _value_at(node, self._geom_geojson)
+            if (isinstance(value, dict)
+                    and value.get('type') in GEOJSON_TYPES
+                    and ('coordinates' in value or 'geometries' in value)):
+                return value
+            return None
+
+        if self._geom_x:
+            try:
+                x = float(_value_at(node, self._geom_x))
+                y = float(_value_at(node, self._geom_y))
+            except (TypeError, ValueError):
+                LOGGER.debug('node without a valid point geometry')
+                return None
+            if not (math.isfinite(x) and math.isfinite(y)):
+                LOGGER.debug('node with non-finite coordinates')
+                return None
+            return {'type': 'Point', 'coordinates': [x, y]}
+
+        return None
+
+    def _check_unsupported(self, resulttype, bbox, datetime_, properties,
+                           q, filterq):
+        """
+        Reject query parameters version 1 does not support
+
+        :param resulttype: results or hits
+        :param bbox: bounding box
+        :param datetime_: temporal filter
+        :param properties: list of tuples (name, value)
+        :param q: full-text search term(s)
+        :param filterq: CQL filter
+        """
+
+        if resulttype == 'hits':
+            _unsupported('resulttype hits is not supported')
+        if bbox:
+            _unsupported('bbox is not supported')
+        if datetime_ is not None:
+            _unsupported('datetime is not supported')
+        if properties:
+            _unsupported('property filters are not supported')
+        if q is not None:
+            _unsupported('q is not supported')
+        if filterq is not None:
+            _unsupported('CQL filters are not supported')
 
     @crs_transform
     def query(self, offset=0, limit=10, resulttype='results',
@@ -564,7 +886,41 @@ class GraphQLProvider(BaseProvider):
         :returns: dict of GeoJSON FeatureCollection
         """
 
-        raise NotImplementedError()
+        self._check_unsupported(resulttype, bbox, datetime_, properties,
+                                q, kwargs.get('filterq'))
+        if offset + limit > INT32_MAX:
+            msg = f'offset {offset} beyond Int32'
+            LOGGER.error(msg)
+            raise ProviderInvalidQueryError(user_msg='offset too large')
+
+        order = self._order(sortby)
+        props, paths = self._selection(select_properties, skip_geometry)
+        document = self._document(paths, with_sort=bool(order))
+        base = {'sortby': order} if order else {}
+
+        features = []
+        remaining = limit
+        position = offset
+        while remaining > 0:
+            variables = {'limit': min(self.page_size, remaining),
+                         'offset': position, **base}
+            nodes = self._post(document, variables)
+            if len(nodes) > variables['limit']:
+                LOGGER.debug('reply longer than requested, truncating')
+                nodes = nodes[:variables['limit']]
+            for node in nodes:
+                if node is None:
+                    msg = 'null node in reply'
+                    LOGGER.error(msg)
+                    raise ProviderQueryError(msg)
+                features.append(self._feature(node, props, skip_geometry))
+            if len(nodes) < variables['limit']:
+                break
+            position += len(nodes)
+            remaining -= len(nodes)
+
+        return {'type': 'FeatureCollection', 'features': features,
+                'numberReturned': len(features)}
 
     @crs_transform
     def get(self, identifier, **kwargs):

@@ -1,0 +1,517 @@
+[
+  {
+    "name": "defaults",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 10,
+      "offset": 0,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572576,
+            "profileCode": "icr056260",
+            "countryName": "Zambia",
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812
+          },
+          {
+            "profileId": 572577,
+            "profileCode": "icr056261",
+            "countryName": "Zambia",
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812
+          },
+          {
+            "profileId": 572578,
+            "profileCode": "icr056281",
+            "countryName": "Zambia",
+            "longitude": 28.279926300048828,
+            "latitude": -16.112810134887695
+          },
+          {
+            "profileId": 572579,
+            "profileCode": "icr056341",
+            "countryName": "Zambia",
+            "longitude": 28.287837982177734,
+            "latitude": -16.041433334350586
+          },
+          {
+            "profileId": 572580,
+            "profileCode": "icr056360",
+            "countryName": "Zambia",
+            "longitude": 28.307998657226562,
+            "latitude": -16.113950729370117
+          },
+          {
+            "profileId": 572581,
+            "profileCode": "icr056320",
+            "countryName": "Zambia",
+            "longitude": 28.283489227294922,
+            "latitude": -16.069473266601562
+          },
+          {
+            "profileId": 572582,
+            "profileCode": "icr056321",
+            "countryName": "Zambia",
+            "longitude": 28.283489227294922,
+            "latitude": -16.069473266601562
+          },
+          {
+            "profileId": 572583,
+            "profileCode": "icr056340",
+            "countryName": "Zambia",
+            "longitude": 28.287837982177734,
+            "latitude": -16.041433334350586
+          },
+          {
+            "profileId": 572584,
+            "profileCode": "icr056361",
+            "countryName": "Zambia",
+            "longitude": 28.307998657226562,
+            "latitude": -16.113950729370117
+          },
+          {
+            "profileId": 572585,
+            "profileCode": "icr056380",
+            "countryName": "Zambia",
+            "longitude": 28.3028507232666,
+            "latitude": -16.09050750732422
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 2
+      }
+    }
+  },
+  {
+    "name": "offset",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 5,
+      "offset": 5,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572581,
+            "profileCode": "icr056320",
+            "countryName": "Zambia",
+            "longitude": 28.283489227294922,
+            "latitude": -16.069473266601562
+          },
+          {
+            "profileId": 572582,
+            "profileCode": "icr056321",
+            "countryName": "Zambia",
+            "longitude": 28.283489227294922,
+            "latitude": -16.069473266601562
+          },
+          {
+            "profileId": 572583,
+            "profileCode": "icr056340",
+            "countryName": "Zambia",
+            "longitude": 28.287837982177734,
+            "latitude": -16.041433334350586
+          },
+          {
+            "profileId": 572584,
+            "profileCode": "icr056361",
+            "countryName": "Zambia",
+            "longitude": 28.307998657226562,
+            "latitude": -16.113950729370117
+          },
+          {
+            "profileId": 572585,
+            "profileCode": "icr056380",
+            "countryName": "Zambia",
+            "longitude": 28.3028507232666,
+            "latitude": -16.09050750732422
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 2
+      }
+    }
+  },
+  {
+    "name": "chunking",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 2,
+      "offset": 0,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572576,
+            "profileCode": "icr056260",
+            "countryName": "Zambia",
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812
+          },
+          {
+            "profileId": 572577,
+            "profileCode": "icr056261",
+            "countryName": "Zambia",
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 1
+      }
+    }
+  },
+  {
+    "name": "chunking",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 2,
+      "offset": 2,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572578,
+            "profileCode": "icr056281",
+            "countryName": "Zambia",
+            "longitude": 28.279926300048828,
+            "latitude": -16.112810134887695
+          },
+          {
+            "profileId": 572579,
+            "profileCode": "icr056341",
+            "countryName": "Zambia",
+            "longitude": 28.287837982177734,
+            "latitude": -16.041433334350586
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 1
+      }
+    }
+  },
+  {
+    "name": "chunking",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 1,
+      "offset": 4,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572580,
+            "profileCode": "icr056360",
+            "countryName": "Zambia",
+            "longitude": 28.307998657226562,
+            "latitude": -16.113950729370117
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 1
+      }
+    }
+  },
+  {
+    "name": "empty",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 10,
+      "offset": 9000000,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": []
+      },
+      "meta": {
+        "graphqlQueryCost": 2
+      }
+    }
+  },
+  {
+    "name": "sort_desc",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 5,
+      "offset": 0,
+      "sortby": [
+        "COUNTRY_NAME_DESC",
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572601,
+            "profileCode": "icr074231",
+            "countryName": "Zimbabwe",
+            "longitude": 29.48419952392578,
+            "latitude": -18.091100692749023
+          },
+          {
+            "profileId": 572602,
+            "profileCode": "icr074232",
+            "countryName": "Zimbabwe",
+            "longitude": 29.48419952392578,
+            "latitude": -18.091100692749023
+          },
+          {
+            "profileId": 572603,
+            "profileCode": "icr074248",
+            "countryName": "Zimbabwe",
+            "longitude": 29.484100341796875,
+            "latitude": -18.068300247192383
+          },
+          {
+            "profileId": 572604,
+            "profileCode": "icr074249",
+            "countryName": "Zimbabwe",
+            "longitude": 29.484100341796875,
+            "latitude": -18.068300247192383
+          },
+          {
+            "profileId": 572605,
+            "profileCode": "icr075331",
+            "countryName": "Zimbabwe",
+            "longitude": 31.836299896240234,
+            "latitude": -17.865299224853516
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 2
+      }
+    }
+  },
+  {
+    "name": "select",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 5,
+      "offset": 0,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572576,
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812
+          },
+          {
+            "profileId": 572577,
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812
+          },
+          {
+            "profileId": 572578,
+            "longitude": 28.279926300048828,
+            "latitude": -16.112810134887695
+          },
+          {
+            "profileId": 572579,
+            "longitude": 28.287837982177734,
+            "latitude": -16.041433334350586
+          },
+          {
+            "profileId": 572580,
+            "longitude": 28.307998657226562,
+            "latitude": -16.113950729370117
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 1
+      }
+    }
+  },
+  {
+    "name": "skip_geometry",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n  }\n}",
+    "variables": {
+      "limit": 5,
+      "offset": 0,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572576,
+            "profileCode": "icr056260",
+            "countryName": "Zambia"
+          },
+          {
+            "profileId": 572577,
+            "profileCode": "icr056261",
+            "countryName": "Zambia"
+          },
+          {
+            "profileId": 572578,
+            "profileCode": "icr056281",
+            "countryName": "Zambia"
+          },
+          {
+            "profileId": 572579,
+            "profileCode": "icr056341",
+            "countryName": "Zambia"
+          },
+          {
+            "profileId": 572580,
+            "profileCode": "icr056360",
+            "countryName": "Zambia"
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 1
+      }
+    }
+  },
+  {
+    "name": "geojson",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n    geom {\n      geojson\n    }\n  }\n}",
+    "variables": {
+      "limit": 5,
+      "offset": 0,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ]
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572576,
+            "profileCode": "icr056260",
+            "countryName": "Zambia",
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812,
+            "geom": {
+              "geojson": {
+                "type": "Point",
+                "coordinates": [
+                  28.257427216,
+                  -16.044876099
+                ]
+              }
+            }
+          },
+          {
+            "profileId": 572577,
+            "profileCode": "icr056261",
+            "countryName": "Zambia",
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812,
+            "geom": {
+              "geojson": {
+                "type": "Point",
+                "coordinates": [
+                  28.257427216,
+                  -16.044876099
+                ]
+              }
+            }
+          },
+          {
+            "profileId": 572578,
+            "profileCode": "icr056281",
+            "countryName": "Zambia",
+            "longitude": 28.279926300048828,
+            "latitude": -16.112810134887695,
+            "geom": {
+              "geojson": {
+                "type": "Point",
+                "coordinates": [
+                  28.2799263,
+                  -16.112810135
+                ]
+              }
+            }
+          },
+          {
+            "profileId": 572579,
+            "profileCode": "icr056341",
+            "countryName": "Zambia",
+            "longitude": 28.287837982177734,
+            "latitude": -16.041433334350586,
+            "geom": {
+              "geojson": {
+                "type": "Point",
+                "coordinates": [
+                  28.287837982,
+                  -16.041433334
+                ]
+              }
+            }
+          },
+          {
+            "profileId": 572580,
+            "profileCode": "icr056360",
+            "countryName": "Zambia",
+            "longitude": 28.307998657226562,
+            "latitude": -16.113950729370117,
+            "geom": {
+              "geojson": {
+                "type": "Point",
+                "coordinates": [
+                  28.307998657,
+                  -16.113950729
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 2
+      }
+    }
+  }
+]
