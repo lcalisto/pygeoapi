@@ -43,7 +43,9 @@ from pygeoapi.crs import crs_transform
 from pygeoapi.provider.base import (BaseProvider, ProviderConnectionError,
                                     ProviderGenericError,
                                     ProviderInvalidQueryError,
+                                    ProviderItemNotFoundError,
                                     ProviderQueryError)
+from pygeoapi.util import bbox2geojsongeometry
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,6 +53,10 @@ DEFAULT_PAGE_SIZE = 100
 DEFAULT_TIMEOUT = 30
 
 INT32_MAX = 2 ** 31 - 1
+INT32_MIN = -2 ** 31
+
+#: scalar types a property filter can cast to; enums are also filterable
+FILTER_SCALARS = {'Int', 'Float', 'Boolean', 'String', 'ID'}
 
 GEOJSON_TYPES = {'Point', 'MultiPoint', 'LineString', 'MultiLineString',
                  'Polygon', 'MultiPolygon', 'GeometryCollection'}
@@ -119,6 +125,41 @@ def _positive_int(value, key):
         _config_error(f'{key} must be a positive integer')
 
     return value
+
+
+def _cast_value(value, type_):
+    """
+    Cast a client value to the GraphQL type; ValueError if it does not fit
+
+    :param value: client value, a string from the query parameters
+    :param type_: GraphQL named type
+
+    :returns: the cast value
+    """
+
+    text = value if isinstance(value, str) else str(value)
+    if is_enum_type(type_):
+        if text not in type_.values:
+            raise ValueError(text)
+        return text
+    if type_.name == 'Int':
+        if not re.fullmatch(r'-?[0-9]+', text):
+            raise ValueError(text)
+        number = int(text)
+        if not INT32_MIN <= number <= INT32_MAX:
+            raise ValueError(text)
+        return number
+    if type_.name == 'Float':
+        number = float(text)
+        if not math.isfinite(number):
+            raise ValueError(text)
+        return number
+    if type_.name == 'Boolean':
+        if text not in ('true', 'false'):
+            raise ValueError(text)
+        return text == 'true'
+
+    return text
 
 
 def _post_graphql(session, url, headers, timeout, document, variables=None):
@@ -224,8 +265,8 @@ def _field_schema(type_):
 
 def _order_map(mapping, order_type):
     """
-    Map property names to orderBy enum value pairs by normalised name;
-    keys come from the mapped GraphQL field, dotted paths are not sortable
+    Map property names to orderBy enum value pairs by normalised name.
+    Keys come from the mapped GraphQL field; dotted paths are not sortable
 
     :param mapping: property mapping
     :param order_type: orderBy GraphQL enum type
@@ -496,6 +537,7 @@ class GraphQLProvider(BaseProvider):
         self._geometry_paths()
         self._check_bbox_filter()
         self._build_sorting(field)
+        self._build_filtering()
 
     def _node(self, field):
         """
@@ -673,6 +715,94 @@ class GraphQLProvider(BaseProvider):
             LOGGER.warning(f'no orderBy value for {self.id_field}: '
                            'paging order is not guaranteed')
 
+    def _build_filtering(self):
+        """Map filterable properties to their filter fields and types"""
+
+        self._filter_map = {}
+        if self._filter_type is None:
+            return
+
+        for prop, (path, type_) in self._mapping.items():
+            if len(path) != 1:
+                continue
+            inner = type_.of_type if is_non_null_type(type_) else type_
+            if is_list_type(inner):
+                continue
+            named = get_named_type(type_)
+            if not (is_enum_type(named) or named.name in FILTER_SCALARS):
+                continue
+            field = self._filter_type.fields.get(path[0])
+            if field is None:
+                continue
+            operators = get_named_type(field.type)
+            if not is_input_object_type(operators):
+                continue
+            if 'equalTo' in operators.fields:
+                self._filter_map[prop] = (path[0], named)
+
+    def _filter(self, properties, bbox):
+        """
+        Build the filter variable from property filters and bbox
+
+        :param properties: list of tuples (name, value)
+        :param bbox: bounding box [minx,miny,maxx,maxy]
+
+        :returns: dict of filter conditions, or None when there are none
+        """
+
+        if not properties and not bbox:
+            return None
+
+        conditions = {}
+        if properties and self._filter_type is None:
+            _unsupported('property filters are not supported')
+        for prop, value in properties:
+            entry = self._filter_map.get(prop)
+            if entry is None:
+                msg = f'property {prop} is not filterable'
+                LOGGER.error(msg)
+                raise ProviderInvalidQueryError(
+                    user_msg='property is not filterable')
+            field, type_ = entry
+            if field in conditions:
+                _unsupported('duplicate property filter')
+            try:
+                conditions[field] = {'equalTo': _cast_value(value, type_)}
+            except ValueError:
+                msg = f'invalid value for property {prop}'
+                LOGGER.error(msg)
+                raise ProviderInvalidQueryError(
+                    user_msg='invalid property filter value')
+        if bbox:
+            conditions.update(self._bbox_condition(bbox))
+
+        return conditions
+
+    def _bbox_condition(self, bbox):
+        """
+        Build the bbox filter condition
+
+        :param bbox: bounding box [minx,miny,maxx,maxy], or 6 values
+
+        :returns: dict with the configured bbox field condition
+        """
+
+        if self.bbox_field is None:
+            _unsupported('bbox is not supported')
+        if len(bbox) == 6:
+            bbox = [bbox[0], bbox[1], bbox[3], bbox[4]]
+        if len(bbox) != 4:
+            _unsupported('bbox must have 4 or 6 values')
+        finite = all(isinstance(value, (int, float))
+                     and math.isfinite(value) for value in bbox)
+        if not finite:
+            _unsupported('bbox values must be finite numbers')
+        if bbox[0] > bbox[2]:
+            _unsupported('bbox crossing the antimeridian is not supported')
+
+        polygon = bbox2geojsongeometry(bbox)
+        return {self.bbox_field: {self.bbox_operator: polygon}}
+
     def _selection(self, select_properties, skip_geometry):
         """
         Properties to return and field paths to request upstream
@@ -839,27 +969,20 @@ class GraphQLProvider(BaseProvider):
 
         return None
 
-    def _check_unsupported(self, resulttype, bbox, datetime_, properties,
-                           q, filterq):
+    def _check_unsupported(self, resulttype, datetime_, q, filterq):
         """
         Reject query parameters version 1 does not support
 
         :param resulttype: results or hits
-        :param bbox: bounding box
         :param datetime_: temporal filter
-        :param properties: list of tuples (name, value)
         :param q: full-text search term(s)
         :param filterq: CQL filter
         """
 
         if resulttype == 'hits':
             _unsupported('resulttype hits is not supported')
-        if bbox:
-            _unsupported('bbox is not supported')
         if datetime_ is not None:
             _unsupported('datetime is not supported')
-        if properties:
-            _unsupported('property filters are not supported')
         if q is not None:
             _unsupported('q is not supported')
         if filterq is not None:
@@ -886,17 +1009,23 @@ class GraphQLProvider(BaseProvider):
         :returns: dict of GeoJSON FeatureCollection
         """
 
-        self._check_unsupported(resulttype, bbox, datetime_, properties,
-                                q, kwargs.get('filterq'))
+        self._check_unsupported(resulttype, datetime_, q,
+                                kwargs.get('filterq'))
         if offset + limit > INT32_MAX:
             msg = f'offset {offset} beyond Int32'
             LOGGER.error(msg)
             raise ProviderInvalidQueryError(user_msg='offset too large')
 
+        filter_ = self._filter(properties, bbox)
         order = self._order(sortby)
         props, paths = self._selection(select_properties, skip_geometry)
-        document = self._document(paths, with_sort=bool(order))
-        base = {'sortby': order} if order else {}
+        document = self._document(paths, with_sort=bool(order),
+                                  with_filter=filter_ is not None)
+        base = {}
+        if order:
+            base['sortby'] = order
+        if filter_ is not None:
+            base['filter'] = filter_
 
         features = []
         remaining = limit
@@ -932,7 +1061,33 @@ class GraphQLProvider(BaseProvider):
         :returns: dict of single GeoJSON feature
         """
 
-        raise NotImplementedError()
+        entry = self._filter_map.get(self.id_field)
+        if entry is None:
+            _unsupported('item lookup is not supported')
+        field, type_ = entry
+
+        try:
+            value = _cast_value(identifier, type_)
+        except ValueError:
+            msg = f'identifier {identifier} does not fit the id type'
+            LOGGER.error(msg)
+            raise ProviderItemNotFoundError(msg)
+
+        props, paths = self._selection([], False)
+        document = self._document(paths, with_sort=False, with_filter=True)
+        variables = {'limit': 1, 'offset': 0,
+                     'filter': {field: {'equalTo': value}}}
+        nodes = self._post(document, variables)
+        if not nodes:
+            msg = f'item {identifier} not found'
+            LOGGER.error(msg)
+            raise ProviderItemNotFoundError(msg)
+        if nodes[0] is None:
+            msg = 'null node in reply'
+            LOGGER.error(msg)
+            raise ProviderQueryError(msg)
+
+        return self._feature(nodes[0], props, False)
 
     def __repr__(self):
         return f'<GraphQLProvider> {self.data}'

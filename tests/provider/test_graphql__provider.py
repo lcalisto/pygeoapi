@@ -40,7 +40,8 @@ from graphql import (build_client_schema, build_schema,
                      get_introspection_query, graphql_sync, parse, validate)
 
 from pygeoapi.api import API
-from pygeoapi.api.itemtypes import get_collection_queryables
+from pygeoapi.api.itemtypes import (get_collection_item, get_collection_items,
+                                    get_collection_queryables)
 from pygeoapi.crs import CrsTransformSpec, get_crs
 from pygeoapi.openapi import get_oas
 from pygeoapi.plugin import load_plugin
@@ -48,9 +49,10 @@ from pygeoapi.provider import graphql_
 from pygeoapi.provider.base import (ProviderConnectionError,
                                     ProviderGenericError,
                                     ProviderInvalidQueryError,
+                                    ProviderItemNotFoundError,
                                     ProviderQueryError)
 from pygeoapi.provider.graphql_ import GraphQLProvider
-from pygeoapi.util import yaml_load
+from pygeoapi.util import bbox2geojsongeometry, yaml_load
 
 from ..util import get_test_file_path, mock_api_request
 
@@ -70,6 +72,47 @@ POINTS_SDL = '''
     type Query { points(first: Int, offset: Int): [Pt] }
     type Pt { id: Int x: Float y: Float }
 '''
+
+FILTER_SDL = '''
+    scalar JSON
+    enum Mood { HAPPY SAD }
+    input IntEq { equalTo: Int }
+    input FloatEq { equalTo: Float }
+    input BoolEq { equalTo: Boolean }
+    input StrEq { equalTo: String }
+    input MoodEq { equalTo: Mood }
+    input JsonEq { equalTo: JSON }
+    input StrListEq { equalTo: [String] }
+    input StrIncludes { includes: String }
+    input ThingFilter {
+      id: IntEq
+      score: FloatEq
+      ok: BoolEq
+      name: StrEq
+      mood: MoodEq
+      blob: JsonEq
+      tags: StrListEq
+      fuzzy: StrIncludes
+      raw: String
+    }
+    type Query {
+      things(first: Int, offset: Int, filter: ThingFilter): [Thing]
+    }
+    type Thing {
+      id: Int
+      score: Float
+      ok: Boolean
+      name: String
+      mood: Mood
+      label: String
+      blob: JSON
+      tags: [String]
+      fuzzy: String
+      raw: String
+    }
+'''
+
+LISBON_BBOX = [-9.36, 38.66, -9.26, 38.73]
 
 
 class FakeResponse:
@@ -755,6 +798,7 @@ def test_query_defaults(config, transport):
     assert data_calls(transport) == [
         {'limit': 10, 'offset': 0, 'sortby': ['PROFILE_ID_ASC']}]
     # layout pinned: one variable and one argument per line
+    # the exact variables and document also pin the omitted filter
     document = transport.calls[-1]['payload']['query']
     assert document == recorded_interaction('defaults')['document']
 
@@ -1010,9 +1054,7 @@ def test_no_id_sort_warns(transport, things_config, caplog):
 
 @pytest.mark.parametrize('kwargs,error', [
     ({'resulttype': 'hits'}, 'resulttype hits'),
-    ({'bbox': [0, 0, 1, 1]}, 'bbox'),
     ({'datetime_': '2020-01-01'}, 'datetime'),
-    ({'properties': [('countryName', 'Portugal')]}, 'property filters'),
     ({'q': 'soil'}, 'q is not supported'),
     ({'filterq': "countryName = 'x'"}, 'CQL')
 ])
@@ -1117,6 +1159,228 @@ def test_document_validates(config, transport):
     assert validate(schema, parse(document)) == []
 
 
+def test_filter_string(config, transport):
+    # aliased properties: the sent filter must use the GraphQL field names
+    config['id_field'] = 'id'
+    config['title_field'] = 'code'
+    config['graphql']['field_mapping'] = {'id': 'profileId',
+                                          'code': 'profileCode',
+                                          'country': 'countryName'}
+    result = GraphQLProvider(config).query(
+        properties=[('country', 'Portugal')])
+
+    assert result['numberReturned'] > 0
+    countries = {feature['properties']['country']
+                 for feature in result['features']}
+    assert countries == {'Portugal'}
+    variables = data_calls(transport)[-1]
+    assert variables['filter'] == {'countryName': {'equalTo': 'Portugal'}}
+    assert variables['sortby'] == ['PROFILE_ID_ASC']
+
+
+def test_filter_typed_cast(transport, things_config):
+    synthetic(transport, FILTER_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=False,
+                           with_filter=True)
+    expected = {'id': {'equalTo': -5}, 'score': {'equalTo': 1.5},
+                'ok': {'equalTo': True}, 'mood': {'equalTo': 'HAPPY'}}
+    transport.add(SYNTH_URL, document,
+                  {'limit': 2, 'offset': 0, 'filter': expected},
+                  {'data': {'things': []}})
+    p.query(limit=2, properties=[('id', '-5'), ('score', '1.5'),
+                                 ('ok', 'true'), ('mood', 'HAPPY')])
+
+    assert data_calls(transport)[-1]['filter'] == expected
+
+
+@pytest.mark.parametrize('prop,value', [
+    ('id', '2.5'),
+    ('id', str(2 ** 31)),
+    ('score', 'high'),
+    ('score', 'nan'),
+    ('ok', 'True'),
+    ('mood', 'ANGRY')
+])
+def test_filter_invalid_value_400(transport, things_config, prop, value):
+    synthetic(transport, FILTER_SDL)
+    p = GraphQLProvider(things_config)
+
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.query(properties=[(prop, value)])
+
+    assert err.value.user_msg == 'invalid property filter value'
+
+
+def test_filter_injection_attempt(transport, things_config):
+    synthetic(transport, FILTER_SDL)
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=False,
+                           with_filter=True)
+    hostile = '"}) { things { id } } #'
+    transport.add(SYNTH_URL, document,
+                  {'limit': 1, 'offset': 0,
+                   'filter': {'name': {'equalTo': hostile}}},
+                  {'data': {'things': []}})
+    p.query(limit=1, properties=[('name', hostile)])
+
+    payload = transport.calls[-1]['payload']
+    assert hostile not in payload['query']
+    assert payload['variables']['filter']['name']['equalTo'] == hostile
+
+
+@pytest.mark.parametrize('prop', ['label', 'blob', 'tags', 'fuzzy', 'raw'])
+def test_filter_not_filterable_400(transport, things_config, prop):
+    synthetic(transport, FILTER_SDL)
+    p = GraphQLProvider(things_config)
+
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.query(properties=[(prop, 'x')])
+
+    assert err.value.user_msg == 'property is not filterable'
+
+
+def test_filter_unknown_property_400(config):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.query(properties=[('nope', 'x')])
+
+    assert err.value.user_msg == 'property is not filterable'
+
+
+def test_filter_duplicate_property_400(config):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderInvalidQueryError, match='duplicate'):
+        p.query(properties=[('countryName', 'a'), ('countryName', 'b')])
+
+
+def test_no_filter_argument_400(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.query(properties=[('name', 'a')])
+
+    assert err.value.user_msg == 'property filters are not supported'
+
+
+def test_bbox_4(config, transport):
+    result = GraphQLProvider(config).query(bbox=LISBON_BBOX)
+
+    assert result['numberReturned'] > 0
+    for feature in result['features']:
+        lon, lat = feature['geometry']['coordinates']
+        assert LISBON_BBOX[0] <= lon <= LISBON_BBOX[2]
+        assert LISBON_BBOX[1] <= lat <= LISBON_BBOX[3]
+    variables = data_calls(transport)[-1]
+    polygon = variables['filter']['geom']['bboxIntersects2D']
+    assert polygon == bbox2geojsongeometry(LISBON_BBOX)
+
+
+def test_bbox_6_reduced(config, transport):
+    bbox = [LISBON_BBOX[0], LISBON_BBOX[1], 0,
+            LISBON_BBOX[2], LISBON_BBOX[3], 100]
+    GraphQLProvider(config).query(bbox=bbox)
+
+    variables = data_calls(transport)[-1]
+    polygon = variables['filter']['geom']['bboxIntersects2D']
+    assert polygon == bbox2geojsongeometry(LISBON_BBOX)
+
+
+def test_bbox_antimeridian_400(config, transport):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderInvalidQueryError, match='antimeridian'):
+        p.query(bbox=[170, 0, -170, 10])
+
+    assert data_calls(transport) == []
+
+
+@pytest.mark.parametrize('bad', [float('nan'), 'west'])
+def test_bbox_nonfinite_400(config, transport, bad):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderInvalidQueryError, match='finite'):
+        p.query(bbox=[bad, 0, 1, 1])
+
+    assert data_calls(transport) == []
+
+
+def test_bbox_not_configured_400(transport, things_config):
+    synthetic(transport, THINGS_SDL)
+    p = GraphQLProvider(things_config)
+
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.query(bbox=[0, 0, 1, 1])
+
+    assert err.value.user_msg == 'bbox is not supported'
+
+
+def test_bbox_with_property_filter(config, transport):
+    result = GraphQLProvider(config).query(
+        bbox=LISBON_BBOX, properties=[('countryName', 'Portugal')])
+
+    assert result['numberReturned'] > 0
+    variables = data_calls(transport)[-1]
+    assert variables['filter']['countryName'] == {'equalTo': 'Portugal'}
+    assert 'bboxIntersects2D' in variables['filter']['geom']
+
+
+def test_get(config, transport):
+    # aliased id: the sent filter must use the GraphQL field name
+    config['id_field'] = 'id'
+    config['title_field'] = 'code'
+    config['graphql']['field_mapping'] = {'id': 'profileId',
+                                          'code': 'profileCode',
+                                          'country': 'countryName'}
+    feature = GraphQLProvider(config).get('572576')
+
+    assert feature['type'] == 'Feature'
+    assert feature['id'] == 572576
+    assert feature['properties']['id'] == 572576
+    assert feature['geometry']['type'] == 'Point'
+    payload = transport.calls[-1]['payload']
+    assert payload['variables'] == {
+        'limit': 1, 'offset': 0,
+        'filter': {'profileId': {'equalTo': 572576}}}
+    assert '$sortby' not in payload['query']
+
+
+def test_get_not_found(config):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderItemNotFoundError, match='not found'):
+        p.get(999999999)
+
+
+def test_get_bad_identifier(config, transport):
+    p = GraphQLProvider(config)
+
+    with pytest.raises(ProviderItemNotFoundError):
+        p.get('abc')
+
+    assert data_calls(transport) == []
+
+
+def test_get_id_not_filterable_400(transport, things_config):
+    synthetic(transport, '''
+        input StrEq { equalTo: String }
+        input ThingFilter { name: StrEq }
+        type Query {
+          things(first: Int, offset: Int, filter: ThingFilter): [Thing]
+        }
+        type Thing { id: Int name: String }
+    ''')
+    p = GraphQLProvider(things_config)
+
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.get(1)
+
+    assert err.value.user_msg == 'item lookup is not supported'
+
+
 def test_api_queryables(graphql_api):
     req = mock_api_request({'f': 'json'})
     headers, code, response = get_collection_queryables(
@@ -1132,3 +1396,35 @@ def test_api_openapi(graphql_config):
     oas = get_oas(graphql_config)
 
     assert '/collections/wosis-profiles/items' in oas['paths']
+
+
+def test_api_items(graphql_api):
+    req = mock_api_request({'f': 'json'})
+    headers, code, response = get_collection_items(
+        graphql_api, req, 'wosis-profiles')
+
+    assert code == HTTPStatus.OK
+    collection = json.loads(response)
+    assert collection['numberReturned'] == 10
+    assert len(collection['features']) == 10
+    rels = {link['rel'] for link in collection['links']}
+    assert 'next' in rels
+
+
+def test_api_item(graphql_api):
+    req = mock_api_request({'f': 'json'})
+    headers, code, response = get_collection_item(
+        graphql_api, req, 'wosis-profiles', '572576')
+
+    assert code == HTTPStatus.OK
+    feature = json.loads(response)
+    assert feature['id'] == 572576
+
+
+def test_api_400_message(graphql_api):
+    req = mock_api_request({'f': 'json', 'resulttype': 'hits'})
+    headers, code, response = get_collection_items(
+        graphql_api, req, 'wosis-profiles')
+
+    assert code == HTTPStatus.BAD_REQUEST
+    assert 'resulttype hits is not supported' in response

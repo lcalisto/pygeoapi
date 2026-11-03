@@ -513,5 +513,400 @@
         "graphqlQueryCost": 2
       }
     }
+  },
+  {
+    "name": "filter_string",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $filter: WosisLatestProfileFilter\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    filter: $filter\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 10,
+      "offset": 0,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ],
+      "filter": {
+        "countryName": {
+          "equalTo": "Portugal"
+        }
+      }
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 933954,
+            "profileCode": "N26W05T4",
+            "countryName": "Portugal",
+            "longitude": -8.287782669067383,
+            "latitude": 38.49020004272461
+          },
+          {
+            "profileId": 933955,
+            "profileCode": "N26W05T2",
+            "countryName": "Portugal",
+            "longitude": -8.620199203491211,
+            "latitude": 37.63794708251953
+          },
+          {
+            "profileId": 933956,
+            "profileCode": "N26W05T3",
+            "countryName": "Portugal",
+            "longitude": -7.555994987487793,
+            "latitude": 38.34250259399414
+          },
+          {
+            "profileId": 934366,
+            "profileCode": "N26W05S2",
+            "countryName": "Portugal",
+            "longitude": -8.620732307434082,
+            "latitude": 37.63298797607422
+          },
+          {
+            "profileId": 934423,
+            "profileCode": "N28W05S2",
+            "countryName": "Portugal",
+            "longitude": -8.245771408081055,
+            "latitude": 41.55315399169922
+          },
+          {
+            "profileId": 934489,
+            "profileCode": "N27W05S5",
+            "countryName": "Portugal",
+            "longitude": -7.615726470947266,
+            "latitude": 40.12527847290039
+          },
+          {
+            "profileId": 934543,
+            "profileCode": "N27W05S4",
+            "countryName": "Portugal",
+            "longitude": -7.965576648712158,
+            "latitude": 40.50003433227539
+          },
+          {
+            "profileId": 934592,
+            "profileCode": "N28W05S1",
+            "countryName": "Portugal",
+            "longitude": -7.834468364715576,
+            "latitude": 41.594242095947266
+          },
+          {
+            "profileId": 934751,
+            "profileCode": "N26W05F2",
+            "countryName": "Portugal",
+            "longitude": -8.696582794189453,
+            "latitude": 37.6263427734375
+          },
+          {
+            "profileId": 934814,
+            "profileCode": "N27W05F4",
+            "countryName": "Portugal",
+            "longitude": -8.226038932800293,
+            "latitude": 40.32901382446289
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 2
+      }
+    }
+  },
+  {
+    "name": "bbox",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $filter: WosisLatestProfileFilter\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    filter: $filter\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 10,
+      "offset": 0,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ],
+      "filter": {
+        "geom": {
+          "bboxIntersects2D": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  -9.36,
+                  38.66
+                ],
+                [
+                  -9.36,
+                  38.73
+                ],
+                [
+                  -9.26,
+                  38.73
+                ],
+                [
+                  -9.26,
+                  38.66
+                ],
+                [
+                  -9.36,
+                  38.66
+                ]
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 937966,
+            "profileCode": "4272",
+            "countryName": "Portugal",
+            "longitude": -9.33329963684082,
+            "latitude": 38.68330001831055
+          },
+          {
+            "profileId": 938391,
+            "profileCode": "2273",
+            "countryName": "Portugal",
+            "longitude": -9.300000190734863,
+            "latitude": 38.71670150756836
+          },
+          {
+            "profileId": 1044746,
+            "profileCode": "25",
+            "countryName": "Portugal",
+            "longitude": -9.31535530090332,
+            "latitude": 38.70512008666992
+          },
+          {
+            "profileId": 1044747,
+            "profileCode": "38",
+            "countryName": "Portugal",
+            "longitude": -9.317227363586426,
+            "latitude": 38.705440521240234
+          },
+          {
+            "profileId": 1044748,
+            "profileCode": "61",
+            "countryName": "Portugal",
+            "longitude": -9.315452575683594,
+            "latitude": 38.70674133300781
+          },
+          {
+            "profileId": 1044749,
+            "profileCode": "68",
+            "countryName": "Portugal",
+            "longitude": -9.316286087036133,
+            "latitude": 38.706878662109375
+          },
+          {
+            "profileId": 1044750,
+            "profileCode": "45",
+            "countryName": "Portugal",
+            "longitude": -9.314414024353027,
+            "latitude": 38.7064094543457
+          },
+          {
+            "profileId": 1044757,
+            "profileCode": "9",
+            "countryName": "Portugal",
+            "longitude": -9.315549850463867,
+            "latitude": 38.70222854614258
+          },
+          {
+            "profileId": 1044771,
+            "profileCode": "140",
+            "countryName": "Portugal",
+            "longitude": -9.321864128112793,
+            "latitude": 38.703250885009766
+          },
+          {
+            "profileId": 1044772,
+            "profileCode": "161",
+            "countryName": "Portugal",
+            "longitude": -9.320558547973633,
+            "latitude": 38.702430725097656
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 2
+      }
+    }
+  },
+  {
+    "name": "bbox_and_filter",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $filter: WosisLatestProfileFilter\n  $sortby: [WosisLatestProfilesOrderBy!]\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    filter: $filter\n    orderBy: $sortby\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 10,
+      "offset": 0,
+      "sortby": [
+        "PROFILE_ID_ASC"
+      ],
+      "filter": {
+        "countryName": {
+          "equalTo": "Portugal"
+        },
+        "geom": {
+          "bboxIntersects2D": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  -9.36,
+                  38.66
+                ],
+                [
+                  -9.36,
+                  38.73
+                ],
+                [
+                  -9.26,
+                  38.73
+                ],
+                [
+                  -9.26,
+                  38.66
+                ],
+                [
+                  -9.36,
+                  38.66
+                ]
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 937966,
+            "profileCode": "4272",
+            "countryName": "Portugal",
+            "longitude": -9.33329963684082,
+            "latitude": 38.68330001831055
+          },
+          {
+            "profileId": 938391,
+            "profileCode": "2273",
+            "countryName": "Portugal",
+            "longitude": -9.300000190734863,
+            "latitude": 38.71670150756836
+          },
+          {
+            "profileId": 1044746,
+            "profileCode": "25",
+            "countryName": "Portugal",
+            "longitude": -9.31535530090332,
+            "latitude": 38.70512008666992
+          },
+          {
+            "profileId": 1044747,
+            "profileCode": "38",
+            "countryName": "Portugal",
+            "longitude": -9.317227363586426,
+            "latitude": 38.705440521240234
+          },
+          {
+            "profileId": 1044748,
+            "profileCode": "61",
+            "countryName": "Portugal",
+            "longitude": -9.315452575683594,
+            "latitude": 38.70674133300781
+          },
+          {
+            "profileId": 1044749,
+            "profileCode": "68",
+            "countryName": "Portugal",
+            "longitude": -9.316286087036133,
+            "latitude": 38.706878662109375
+          },
+          {
+            "profileId": 1044750,
+            "profileCode": "45",
+            "countryName": "Portugal",
+            "longitude": -9.314414024353027,
+            "latitude": 38.7064094543457
+          },
+          {
+            "profileId": 1044757,
+            "profileCode": "9",
+            "countryName": "Portugal",
+            "longitude": -9.315549850463867,
+            "latitude": 38.70222854614258
+          },
+          {
+            "profileId": 1044771,
+            "profileCode": "140",
+            "countryName": "Portugal",
+            "longitude": -9.321864128112793,
+            "latitude": 38.703250885009766
+          },
+          {
+            "profileId": 1044772,
+            "profileCode": "161",
+            "countryName": "Portugal",
+            "longitude": -9.320558547973633,
+            "latitude": 38.702430725097656
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 2
+      }
+    }
+  },
+  {
+    "name": "get",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $filter: WosisLatestProfileFilter\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    filter: $filter\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 1,
+      "offset": 0,
+      "filter": {
+        "profileId": {
+          "equalTo": 572576
+        }
+      }
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": [
+          {
+            "profileId": 572576,
+            "profileCode": "icr056260",
+            "countryName": "Zambia",
+            "longitude": 28.257427215576172,
+            "latitude": -16.044876098632812
+          }
+        ]
+      },
+      "meta": {
+        "graphqlQueryCost": 1
+      }
+    }
+  },
+  {
+    "name": "get_missing",
+    "document": "query (\n  $limit: Int\n  $offset: Int\n  $filter: WosisLatestProfileFilter\n) {\n  wosisLatestProfiles(\n    first: $limit\n    offset: $offset\n    filter: $filter\n  ) {\n    profileId\n    profileCode\n    countryName\n    longitude\n    latitude\n  }\n}",
+    "variables": {
+      "limit": 1,
+      "offset": 0,
+      "filter": {
+        "profileId": {
+          "equalTo": 999999999
+        }
+      }
+    },
+    "status": 200,
+    "body": {
+      "data": {
+        "wosisLatestProfiles": []
+      },
+      "meta": {
+        "graphqlQueryCost": 1
+      }
+    }
   }
 ]
