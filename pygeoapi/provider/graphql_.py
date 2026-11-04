@@ -35,9 +35,10 @@ from urllib.parse import urlparse
 
 import requests
 from graphql import (GraphQLError, build_client_schema,
-                     get_introspection_query, get_named_type, is_enum_type,
-                     is_input_object_type, is_list_type, is_non_null_type,
-                     is_object_type, is_required_argument, is_scalar_type)
+                     get_introspection_query, get_named_type,
+                     get_nullable_type, is_enum_type, is_input_object_type,
+                     is_list_type, is_object_type, is_required_argument,
+                     is_scalar_type)
 
 from pygeoapi.crs import crs_transform
 from pygeoapi.provider.base import (BaseProvider, ProviderConnectionError,
@@ -55,7 +56,7 @@ DEFAULT_TIMEOUT = 30
 INT32_MAX = 2 ** 31 - 1
 INT32_MIN = -2 ** 31
 
-#: scalar types a property filter can cast to; enums are also filterable
+#: Scalar types a property filter can cast to; enums are also filterable
 FILTER_SCALARS = {'Int', 'Float', 'Boolean', 'String', 'ID'}
 
 GEOJSON_TYPES = {'Point', 'MultiPoint', 'LineString', 'MultiLineString',
@@ -63,8 +64,8 @@ GEOJSON_TYPES = {'Point', 'MultiPoint', 'LineString', 'MultiLineString',
 
 GRAPHQL_NAME = re.compile(r'[_A-Za-z][_0-9A-Za-z]*')
 
-GRAPHQL_KEYS = {'collection', 'geometry', 'bbox_filter', 'page_size',
-                'field_mapping', 'headers', 'timeout'}
+GRAPHQL_CONFIG_KEYS = {'collection', 'geometry', 'bbox_filter', 'page_size',
+                       'field_mapping', 'headers', 'timeout'}
 
 #: GraphQL scalar name to JSON Schema; anything else is a string
 TYPE_MAP = {
@@ -131,7 +132,7 @@ def _cast_value(value, type_):
     """
     Cast a client value to the GraphQL type; ValueError if it does not fit
 
-    :param value: client value, a string from the query parameters
+    :param value: client value, a string from the request
     :param type_: GraphQL named type
 
     :returns: the cast value
@@ -164,7 +165,7 @@ def _cast_value(value, type_):
 
 def _post_graphql(session, url, headers, timeout, document, variables=None):
     """
-    POST a GraphQL document, the only call site in this module
+    POST a GraphQL document, the only HTTP call in this module
 
     :param session: requests.Session
     :param url: endpoint URL
@@ -220,12 +221,12 @@ def _post_graphql(session, url, headers, timeout, document, variables=None):
 
 
 @functools.cache
-def _schema(url, headers_items, timeout):
+def _introspect_schema(url, header_items, timeout):
     """
     Introspect a GraphQL endpoint, cached per worker
 
     :param url: endpoint URL
-    :param headers_items: tuple of sorted HTTP header items
+    :param header_items: tuple of sorted HTTP header items
     :param timeout: request timeout in seconds
 
     :returns: graphql.GraphQLSchema
@@ -234,7 +235,7 @@ def _schema(url, headers_items, timeout):
     document = get_introspection_query(descriptions=False)
     LOGGER.debug(f'Introspecting {url}')
     with requests.Session() as session:
-        data = _post_graphql(session, url, dict(headers_items), timeout,
+        data = _post_graphql(session, url, dict(header_items), timeout,
                              document)
 
     try:
@@ -254,8 +255,7 @@ def _field_schema(type_):
     :returns: dict of JSON Schema keys
     """
 
-    if is_non_null_type(type_):
-        type_ = type_.of_type
+    type_ = get_nullable_type(type_)
     if is_list_type(type_):
         return {'type': 'array'}
 
@@ -265,7 +265,8 @@ def _field_schema(type_):
 
 def _order_map(mapping, order_type):
     """
-    Map property names to orderBy enum value pairs by normalised name.
+    Map property names to orderBy enum value pairs by normalised name
+
     Keys come from the mapped GraphQL field; dotted paths are not sortable
 
     :param mapping: property mapping
@@ -324,9 +325,9 @@ def _render_tree(tree, indent):
     return lines
 
 
-def _unsupported(msg):
+def _raise_invalid(msg):
     """
-    Log and raise an unsupported-parameter error
+    Log and raise an invalid-query error
 
     :param msg: error text, also sent to the client
     """
@@ -380,7 +381,7 @@ class GraphQLProvider(BaseProvider):
         """
 
         self._fields = {prop: _field_schema(type_)
-                        for prop, (_, type_) in self._mapping.items()}
+                        for prop, (_, type_) in self._property_paths.items()}
         return self._fields
 
     def _parse_config(self, provider_def):
@@ -411,7 +412,7 @@ class GraphQLProvider(BaseProvider):
         if not isinstance(graphql, dict):
             _config_error('graphql block must be a mapping')
 
-        unknown = sorted(map(str, set(graphql) - GRAPHQL_KEYS))
+        unknown = sorted(map(str, set(graphql) - GRAPHQL_CONFIG_KEYS))
         if unknown:
             _config_error(f"unknown keys: {', '.join(unknown)}")
 
@@ -479,21 +480,21 @@ class GraphQLProvider(BaseProvider):
         self.bbox_operator = _valid_name(
             bbox_filter['operator'], 'bbox_filter.operator')
 
-    def _parse_field_mapping(self, mapping):
+    def _parse_field_mapping(self, field_mapping):
         """
         Validate the graphql.field_mapping block
 
-        :param mapping: field_mapping configuration
+        :param field_mapping: field_mapping configuration
         """
 
         self.field_mapping = {}
 
-        if mapping is None:
+        if field_mapping is None:
             return
-        if not isinstance(mapping, dict) or not mapping:
+        if not isinstance(field_mapping, dict) or not field_mapping:
             _config_error('field_mapping must be a non-empty mapping')
 
-        for prop, path in mapping.items():
+        for prop, path in field_mapping.items():
             if not isinstance(prop, str) or not prop:
                 _config_error('field_mapping keys must be property names')
             self.field_mapping[prop] = _valid_name(
@@ -522,35 +523,33 @@ class GraphQLProvider(BaseProvider):
     def _resolve_schema(self):
         """Resolve the configuration against the introspected schema"""
 
-        schema = _schema(self.data, tuple(sorted(self.headers.items())),
-                         self.timeout)
+        header_items = tuple(sorted(self.headers.items()))
+        schema = _introspect_schema(self.data, header_items, self.timeout)
         if schema.query_type is None:
             _config_error('endpoint has no query type')
 
-        field = schema.query_type.fields.get(self.collection)
-        if field is None:
+        collection_field = schema.query_type.fields.get(self.collection)
+        if collection_field is None:
             _config_error(f'collection {self.collection} not found')
 
-        self._node_type = self._node(field)
-        self._filter_type = self._check_arguments(field)
-        self._mapping = self._map_fields()
-        self._geometry_paths()
+        self._node_type = self._resolve_node_type(collection_field)
+        self._filter_type = self._check_arguments(collection_field)
+        self._property_paths = self._map_fields()
+        self._resolve_geometry_paths()
         self._check_bbox_filter()
-        self._build_sorting(field)
+        self._build_sorting(collection_field)
         self._build_filtering()
 
-    def _node(self, field):
+    def _resolve_node_type(self, collection_field):
         """
         Node object type of the collection field (list shape)
 
-        :param field: collection field on the query type
+        :param collection_field: field on the query type
 
         :returns: graphql.GraphQLObjectType
         """
 
-        type_ = field.type
-        if is_non_null_type(type_):
-            type_ = type_.of_type
+        type_ = get_nullable_type(collection_field.type)
         if not is_list_type(type_):
             _config_error(f'collection {self.collection} must return a list')
 
@@ -560,33 +559,34 @@ class GraphQLProvider(BaseProvider):
 
         return node
 
-    def _check_arguments(self, field):
+    def _check_arguments(self, collection_field):
         """
         Validate the collection field arguments
 
-        :param field: collection field on the query type
+        :param collection_field: field on the query type
 
         :returns: filter input type, or None
         """
 
         for name in ('first', 'offset'):
-            if name not in field.args:
-                _config_error(f'collection must accept {name}')
-        self._limit_decl = str(field.args['first'].type)
-        self._offset_decl = str(field.args['offset'].type)
+            if name not in collection_field.args:
+                _config_error(f'collection has no {name} argument')
+        self._limit_variable_type = str(collection_field.args['first'].type)
+        self._offset_variable_type = str(collection_field.args['offset'].type)
 
-        for name, arg in field.args.items():
+        for name, arg in collection_field.args.items():
             if name in ('filter', 'orderBy'):
                 if is_required_argument(arg):
                     _config_error(f'argument {name} must be optional')
             elif name not in ('first', 'offset') and is_required_argument(arg):
                 _config_error(f'required argument {name} not supported')
 
-        self._filter_decl = None
-        if 'filter' in field.args:
-            filter_type = get_named_type(field.args['filter'].type)
+        self._filter_variable_type = None
+        if 'filter' in collection_field.args:
+            filter_arg = collection_field.args['filter']
+            filter_type = get_named_type(filter_arg.type)
             if is_input_object_type(filter_type):
-                self._filter_decl = str(field.args['filter'].type)
+                self._filter_variable_type = str(filter_arg.type)
                 return filter_type
 
         return None
@@ -651,8 +651,8 @@ class GraphQLProvider(BaseProvider):
                    for arg in field.args.values()):
                 _config_error(f'{key}: field {part} needs arguments')
             leaf = field.type
-            inner = leaf.of_type if is_non_null_type(leaf) else leaf
-            if is_list_type(inner) and depth < len(parts) - 1:
+            nullable = get_nullable_type(leaf)
+            if is_list_type(nullable) and depth < len(parts) - 1:
                 _config_error(f'{key}: {part} is a list')
             type_ = get_named_type(leaf)
 
@@ -661,7 +661,7 @@ class GraphQLProvider(BaseProvider):
 
         return tuple(parts), leaf
 
-    def _geometry_paths(self):
+    def _resolve_geometry_paths(self):
         """Resolve the configured geometry fields against the node type"""
 
         self._geom_x = self._geom_y = self._geom_geojson = None
@@ -692,24 +692,23 @@ class GraphQLProvider(BaseProvider):
             _config_error(
                 f'bbox_filter operator {self.bbox_operator} not supported')
 
-    def _build_sorting(self, field):
+    def _build_sorting(self, collection_field):
         """
         Build the sort map from the orderBy enum
 
-        :param field: collection field on the query type
+        :param collection_field: field on the query type
         """
 
         self._sort_map = {}
-        self._order_decl = None
+        self._sort_variable_type = None
 
-        if 'orderBy' in field.args:
-            arg_type = field.args['orderBy'].type
-            if is_non_null_type(arg_type):
-                arg_type = arg_type.of_type
+        if 'orderBy' in collection_field.args:
+            sort_arg = collection_field.args['orderBy']
+            arg_type = get_nullable_type(sort_arg.type)
             order_type = get_named_type(arg_type)
             if is_list_type(arg_type) and is_enum_type(order_type):
-                self._order_decl = str(field.args['orderBy'].type)
-                self._sort_map = _order_map(self._mapping, order_type)
+                self._sort_variable_type = str(sort_arg.type)
+                self._sort_map = _order_map(self._property_paths, order_type)
 
         if self.id_field not in self._sort_map:
             LOGGER.warning(f'no orderBy value for {self.id_field}: '
@@ -722,11 +721,11 @@ class GraphQLProvider(BaseProvider):
         if self._filter_type is None:
             return
 
-        for prop, (path, type_) in self._mapping.items():
+        for prop, (path, type_) in self._property_paths.items():
             if len(path) != 1:
                 continue
-            inner = type_.of_type if is_non_null_type(type_) else type_
-            if is_list_type(inner):
+            nullable = get_nullable_type(type_)
+            if is_list_type(nullable):
                 continue
             named = get_named_type(type_)
             if not (is_enum_type(named) or named.name in FILTER_SCALARS):
@@ -740,7 +739,7 @@ class GraphQLProvider(BaseProvider):
             if 'equalTo' in operators.fields:
                 self._filter_map[prop] = (path[0], named)
 
-    def _filter(self, properties, bbox):
+    def _make_filter(self, properties, bbox):
         """
         Build the filter variable from property filters and bbox
 
@@ -755,7 +754,7 @@ class GraphQLProvider(BaseProvider):
 
         conditions = {}
         if properties and self._filter_type is None:
-            _unsupported('property filters are not supported')
+            _raise_invalid('property filters are not supported')
         for prop, value in properties:
             entry = self._filter_map.get(prop)
             if entry is None:
@@ -765,7 +764,7 @@ class GraphQLProvider(BaseProvider):
                     user_msg='property is not filterable')
             field, type_ = entry
             if field in conditions:
-                _unsupported('duplicate property filter')
+                _raise_invalid('duplicate property filter')
             try:
                 conditions[field] = {'equalTo': _cast_value(value, type_)}
             except ValueError:
@@ -788,17 +787,17 @@ class GraphQLProvider(BaseProvider):
         """
 
         if self.bbox_field is None:
-            _unsupported('bbox is not supported')
+            _raise_invalid('bbox is not supported')
         if len(bbox) == 6:
             bbox = [bbox[0], bbox[1], bbox[3], bbox[4]]
         if len(bbox) != 4:
-            _unsupported('bbox must have 4 or 6 values')
+            _raise_invalid('bbox must have 4 or 6 values')
         finite = all(isinstance(value, (int, float))
                      and math.isfinite(value) for value in bbox)
         if not finite:
-            _unsupported('bbox values must be finite numbers')
+            _raise_invalid('bbox values must be finite numbers')
         if bbox[0] > bbox[2]:
-            _unsupported('bbox crossing the antimeridian is not supported')
+            _raise_invalid('bbox crossing the antimeridian is not supported')
 
         polygon = bbox2geojsongeometry(bbox)
         return {self.bbox_field: {self.bbox_operator: polygon}}
@@ -813,12 +812,12 @@ class GraphQLProvider(BaseProvider):
         :returns: tuple of (property names, field paths)
         """
 
-        props = [p for p in self._mapping
+        props = [p for p in self._property_paths
                  if not select_properties or p in select_properties]
 
-        paths = [self._mapping[p][0] for p in props]
+        paths = [self._property_paths[p][0] for p in props]
         if self.id_field not in props:
-            paths.append(self._mapping[self.id_field][0])
+            paths.append(self._property_paths[self.id_field][0])
         if not skip_geometry:
             for path in (self._geom_x, self._geom_y, self._geom_geojson):
                 if path:
@@ -837,14 +836,14 @@ class GraphQLProvider(BaseProvider):
         :returns: str of GraphQL document
         """
 
-        variables = [f'$limit: {self._limit_decl}',
-                     f'$offset: {self._offset_decl}']
+        variables = [f'$limit: {self._limit_variable_type}',
+                     f'$offset: {self._offset_variable_type}']
         arguments = ['first: $limit', 'offset: $offset']
         if with_filter:
-            variables.append(f'$filter: {self._filter_decl}')
+            variables.append(f'$filter: {self._filter_variable_type}')
             arguments.append('filter: $filter')
         if with_sort:
-            variables.append(f'$sortby: {self._order_decl}')
+            variables.append(f'$sortby: {self._sort_variable_type}')
             arguments.append('orderBy: $sortby')
 
         tree = {}
@@ -863,7 +862,7 @@ class GraphQLProvider(BaseProvider):
 
         return '\n'.join(lines)
 
-    def _order(self, sortby):
+    def _make_orderby(self, sortby):
         """
         Map client sortby to orderBy enum values, id as tiebreaker
 
@@ -911,7 +910,7 @@ class GraphQLProvider(BaseProvider):
 
         return nodes
 
-    def _feature(self, node, props, skip_geometry):
+    def _make_feature(self, node, props, skip_geometry):
         """
         Build a GeoJSON feature from a reply node
 
@@ -922,7 +921,7 @@ class GraphQLProvider(BaseProvider):
         :returns: dict of GeoJSON feature
         """
 
-        id_ = _value_at(node, self._mapping[self.id_field][0])
+        id_ = _value_at(node, self._property_paths[self.id_field][0])
         if id_ is None:
             msg = 'id missing in reply'
             LOGGER.error(msg)
@@ -934,7 +933,7 @@ class GraphQLProvider(BaseProvider):
             feature['geometry'] = self._geometry(node)
         for prop in props:
             feature['properties'][prop] = _value_at(
-                node, self._mapping[prop][0])
+                node, self._property_paths[prop][0])
 
         return feature
 
@@ -971,7 +970,7 @@ class GraphQLProvider(BaseProvider):
 
     def _check_unsupported(self, resulttype, datetime_, q, filterq):
         """
-        Reject query parameters version 1 does not support
+        Reject unsupported query parameters
 
         :param resulttype: results or hits
         :param datetime_: temporal filter
@@ -980,13 +979,13 @@ class GraphQLProvider(BaseProvider):
         """
 
         if resulttype == 'hits':
-            _unsupported('resulttype hits is not supported')
+            _raise_invalid('resulttype hits is not supported')
         if datetime_ is not None:
-            _unsupported('datetime is not supported')
+            _raise_invalid('datetime is not supported')
         if q is not None:
-            _unsupported('q is not supported')
+            _raise_invalid('q is not supported')
         if filterq is not None:
-            _unsupported('CQL filters are not supported')
+            _raise_invalid('CQL filters are not supported')
 
     @crs_transform
     def query(self, offset=0, limit=10, resulttype='results',
@@ -1012,27 +1011,27 @@ class GraphQLProvider(BaseProvider):
         self._check_unsupported(resulttype, datetime_, q,
                                 kwargs.get('filterq'))
         if offset + limit > INT32_MAX:
-            msg = f'offset {offset} beyond Int32'
+            msg = f'offset {offset} plus limit {limit} beyond Int32'
             LOGGER.error(msg)
             raise ProviderInvalidQueryError(user_msg='offset too large')
 
-        filter_ = self._filter(properties, bbox)
-        order = self._order(sortby)
+        filter_ = self._make_filter(properties, bbox)
+        order = self._make_orderby(sortby)
         props, paths = self._selection(select_properties, skip_geometry)
         document = self._document(paths, with_sort=bool(order),
                                   with_filter=filter_ is not None)
-        base = {}
+        shared_variables = {}
         if order:
-            base['sortby'] = order
+            shared_variables['sortby'] = order
         if filter_ is not None:
-            base['filter'] = filter_
+            shared_variables['filter'] = filter_
 
         features = []
         remaining = limit
         position = offset
         while remaining > 0:
             variables = {'limit': min(self.page_size, remaining),
-                         'offset': position, **base}
+                         'offset': position, **shared_variables}
             nodes = self._post(document, variables)
             if len(nodes) > variables['limit']:
                 LOGGER.debug('reply longer than requested, truncating')
@@ -1042,7 +1041,7 @@ class GraphQLProvider(BaseProvider):
                     msg = 'null node in reply'
                     LOGGER.error(msg)
                     raise ProviderQueryError(msg)
-                features.append(self._feature(node, props, skip_geometry))
+                features.append(self._make_feature(node, props, skip_geometry))
             if len(nodes) < variables['limit']:
                 break
             position += len(nodes)
@@ -1063,7 +1062,7 @@ class GraphQLProvider(BaseProvider):
 
         entry = self._filter_map.get(self.id_field)
         if entry is None:
-            _unsupported('item lookup is not supported')
+            _raise_invalid('item lookup is not supported')
         field, type_ = entry
 
         try:
@@ -1087,7 +1086,7 @@ class GraphQLProvider(BaseProvider):
             LOGGER.error(msg)
             raise ProviderQueryError(msg)
 
-        return self._feature(nodes[0], props, False)
+        return self._make_feature(nodes[0], props, False)
 
     def __repr__(self):
         return f'<GraphQLProvider> {self.data}'

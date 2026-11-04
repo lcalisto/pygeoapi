@@ -58,7 +58,7 @@ from ..util import get_test_file_path, mock_api_request
 
 WOSIS_URL = 'https://wosis.example.org/graphql'
 WORKSHOP_URL = 'https://workshop.example.org/graphql'
-SYNTH_URL = 'https://graphql.example.org/graphql'
+SYNTHETIC_URL = 'https://graphql.example.org/graphql'
 INTROSPECTION = get_introspection_query(descriptions=False)
 
 THINGS_SDL = '''
@@ -70,8 +70,8 @@ THINGS_SDL = '''
 '''
 
 POINTS_SDL = '''
-    type Query { points(first: Int, offset: Int): [Pt] }
-    type Pt { id: Int x: Float y: Float }
+    type Query { points(first: Int, offset: Int): [Point] }
+    type Point { id: Int x: Float y: Float }
 '''
 
 FILTER_SDL = '''
@@ -153,7 +153,7 @@ class FakeTransport:
         return FakeResponse(body, status_code)
 
 
-def synthetic(transport, sdl, url=SYNTH_URL):
+def serve_sdl_schema(transport, sdl, url=SYNTHETIC_URL):
     """Serve an SDL-built schema as the introspection reply for url"""
 
     result = graphql_sync(build_schema(sdl), INTROSPECTION)
@@ -190,12 +190,12 @@ def recorded_interaction(name):
 
     path = get_test_file_path('data/graphql/wosis_interactions.json')
     with open(path) as fh:
-        return next(ex for ex in json.load(fh) if ex['name'] == name)
+        return next(entry for entry in json.load(fh) if entry['name'] == name)
 
 
 @pytest.fixture(autouse=True)
 def offline(transport):
-    graphql_._schema.cache_clear()
+    graphql_._introspect_schema.cache_clear()
     blocked = mock.patch(
         'requests.adapters.HTTPAdapter.send',
         side_effect=AssertionError('network access blocked in tests'))
@@ -203,7 +203,7 @@ def offline(transport):
         'pygeoapi.provider.graphql_.requests.Session.post', new=transport)
     with blocked, posted:
         yield transport
-    graphql_._schema.cache_clear()
+    graphql_._introspect_schema.cache_clear()
 
 
 @pytest.fixture()
@@ -256,7 +256,7 @@ def things_config():
     return {
         'name': 'GraphQL',
         'type': 'feature',
-        'data': SYNTH_URL,
+        'data': SYNTHETIC_URL,
         'id_field': 'id',
         'graphql': {
             'collection': 'things'
@@ -431,7 +431,7 @@ def test_bbox_filter_invalid(config, bbox_filter):
 
 @pytest.mark.parametrize('key', ['page_size', 'timeout'])
 @pytest.mark.parametrize('value', [0, 'many', True])
-def test_positive_int_keys(config, key, value):
+def test_page_size_and_timeout_invalid(config, key, value):
     config['graphql'][key] = value
 
     with pytest.raises(ProviderGenericError, match=key):
@@ -484,7 +484,7 @@ def test_schema_cache_shared(config, transport):
     assert len(transport.calls) == 1
 
 
-def test_schema_cache_key_headers(config, transport):
+def test_schema_cache_keyed_on_headers(config, transport):
     GraphQLProvider(config)
     config['graphql']['headers'] = {'x-api-key': 'k'}
     GraphQLProvider(config)
@@ -619,7 +619,7 @@ def test_bbox_filter_not_on_filter_type(config, bbox_filter, error):
 
 
 def test_bbox_filter_needs_filter_argument(transport, things_config):
-    synthetic(transport, '''
+    serve_sdl_schema(transport, '''
         type Query { things(first: Int, offset: Int): [Thing] }
         type Thing { id: Int }
     ''')
@@ -631,11 +631,11 @@ def test_bbox_filter_needs_filter_argument(transport, things_config):
 
 
 def test_type_mapping(transport, things_config):
-    synthetic(transport, '''
+    serve_sdl_schema(transport, '''
         scalar Date
         scalar Datetime
         scalar JSON
-        enum Color { RED GREEN }
+        enum Colour { RED GREEN }
         type Query { things(first: Int, offset: Int): [Thing] }
         type Thing {
           id: Int!
@@ -645,7 +645,7 @@ def test_type_mapping(transport, things_config):
           when: Datetime
           blob: JSON
           tags: [String]
-          color: Color
+          colour: Colour
           n2x: Float
           computed(arg: Int!): String
         }
@@ -660,18 +660,18 @@ def test_type_mapping(transport, things_config):
         'when': {'type': 'string', 'format': 'date-time'},
         'blob': {'type': 'object'},
         'tags': {'type': 'array'},
-        'color': {'type': 'string'},
+        'colour': {'type': 'string'},
         'n2x': {'type': 'number'}
     }
 
 
 @pytest.mark.parametrize('arguments,error', [
-    ('first: Int', 'accept offset'),
-    ('offset: Int', 'accept first'),
+    ('first: Int', 'no offset argument'),
+    ('offset: Int', 'no first argument'),
     ('first: Int, offset: Int, token: String!', 'required argument token')
 ])
 def test_collection_arguments(transport, things_config, arguments, error):
-    synthetic(transport, f'''
+    serve_sdl_schema(transport, f'''
         type Query {{ things({arguments}): [Thing] }}
         type Thing {{ id: Int }}
     ''')
@@ -686,7 +686,7 @@ def test_collection_arguments(transport, things_config, arguments, error):
 ])
 def test_filter_and_order_must_be_optional(transport, things_config,
                                            argument, sdl_arg):
-    synthetic(transport, f'''
+    serve_sdl_schema(transport, f'''
         input IntEq {{ equalTo: Int }}
         input ThingFilter {{ id: IntEq }}
         enum ThingsOrderBy {{ ID_ASC ID_DESC }}
@@ -705,8 +705,8 @@ def test_filter_and_order_must_be_optional(transport, things_config,
     ('calc.name', 'needs arguments'),
     ('rels.name', 'is a list')
 ])
-def test_field_mapping_path_guards(transport, things_config, path, error):
-    synthetic(transport, '''
+def test_field_mapping_path_rejected(transport, things_config, path, error):
+    serve_sdl_schema(transport, '''
         type Query { things(first: Int, offset: Int): [Thing] }
         type Thing { id: Int calc(x: Int!): Sub rels: [Sub] }
         type Sub { name: String }
@@ -718,7 +718,7 @@ def test_field_mapping_path_guards(transport, things_config, path, error):
 
 
 def test_geojson_source_excluded(transport, things_config):
-    synthetic(transport, '''
+    serve_sdl_schema(transport, '''
         scalar GeoJSON
         type Query { things(first: Int, offset: Int): [Thing] }
         type Thing { id: Int geo: GeoJSON name: String }
@@ -730,7 +730,7 @@ def test_geojson_source_excluded(transport, things_config):
 
 
 def test_collection_not_a_list(transport, things_config):
-    synthetic(transport, '''
+    serve_sdl_schema(transport, '''
         type Query { things(first: Int, offset: Int): Thing }
         type Thing { id: Int }
     ''')
@@ -740,7 +740,7 @@ def test_collection_not_a_list(transport, things_config):
 
 
 def test_collection_lists_scalars(transport, things_config):
-    synthetic(transport, '''
+    serve_sdl_schema(transport, '''
         type Query { things(first: Int, offset: Int): [String] }
     ''')
 
@@ -843,10 +843,10 @@ def test_query_chunking(config, transport):
 
 
 def test_query_short_page(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 5, 'offset': 0, 'sortby': ['ID_ASC']},
                   {'data': {'things': [{'id': 1, 'name': 'a'},
                                        {'id': 2, 'name': 'b'},
@@ -865,10 +865,10 @@ def test_query_empty(config):
 
 
 def test_query_null_node_rejected(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 3, 'offset': 0, 'sortby': ['ID_ASC']},
                   {'data': {'things': [{'id': 1, 'name': 'a'}, None,
                                        {'id': 3, 'name': 'c'}]}})
@@ -878,10 +878,10 @@ def test_query_null_node_rejected(transport, things_config):
 
 
 def test_query_oversized_page_truncated(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 2, 'offset': 0, 'sortby': ['ID_ASC']},
                   {'data': {'things': [{'id': n, 'name': 'x'}
                                        for n in range(1, 6)]}})
@@ -901,15 +901,15 @@ def test_geometry_geojson(config):
     assert 'coordinates' in geometry
 
 
-def test_geometry_missing_null(transport, things_config):
-    synthetic(transport, POINTS_SDL)
+def test_geometry_xy_invalid(transport, things_config):
+    serve_sdl_schema(transport, POINTS_SDL)
     things_config['graphql'] = {
         'collection': 'points',
         'geometry': {'x_field': 'x', 'y_field': 'y'}
     }
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=False)
-    transport.add(SYNTH_URL, document, {'limit': 4, 'offset': 0},
+    transport.add(SYNTHETIC_URL, document, {'limit': 4, 'offset': 0},
                   {'data': {'points': [{'id': 1, 'x': None, 'y': 2.5},
                                        {'id': 2, 'x': 'abc', 'y': 1.0},
                                        {'id': 3, 'x': 'NaN', 'y': 1.0},
@@ -922,7 +922,7 @@ def test_geometry_missing_null(transport, things_config):
 
 
 def test_geometry_geojson_invalid(transport, things_config):
-    synthetic(transport, '''
+    serve_sdl_schema(transport, '''
         scalar GeoJSON
         type Query { blobs(first: Int, offset: Int): [Blob] }
         type Blob { id: Int geo: GeoJSON }
@@ -933,7 +933,7 @@ def test_geometry_geojson_invalid(transport, things_config):
     }
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=False)
-    transport.add(SYNTH_URL, document, {'limit': 4, 'offset': 0},
+    transport.add(SYNTHETIC_URL, document, {'limit': 4, 'offset': 0},
                   {'data': {'blobs': [
                       {'id': 1, 'geo': {}},
                       {'id': 2, 'geo': {'type': 'Point'}},
@@ -948,10 +948,10 @@ def test_geometry_geojson_invalid(transport, things_config):
 
 
 def test_id_zero_accepted(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 1, 'offset': 0, 'sortby': ['ID_ASC']},
                   {'data': {'things': [{'id': 0, 'name': 'zero'}]}})
     result = p.query(limit=1)
@@ -960,10 +960,10 @@ def test_id_zero_accepted(transport, things_config):
 
 
 def test_non_spatial(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 2, 'offset': 0, 'sortby': ['ID_ASC']},
                   {'data': {'things': [{'id': 1, 'name': 'a'},
                                        {'id': 2, 'name': 'b'}]}})
@@ -1000,11 +1000,11 @@ def test_sortby(config, transport):
                                                    'PROFILE_ID_ASC']
 
 
-def test_sortby_tiebreak(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+def test_sortby_on_id_skips_tiebreak(transport, things_config):
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 2, 'offset': 0, 'sortby': ['ID_DESC']},
                   {'data': {'things': [{'id': 2, 'name': 'b'},
                                        {'id': 1, 'name': 'a'}]}})
@@ -1015,11 +1015,11 @@ def test_sortby_tiebreak(transport, things_config):
     assert result['numberReturned'] == 2
 
 
-def test_sortby_multi_key_ascending(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+def test_sortby_multi_key(transport, things_config):
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 2, 'offset': 0,
                    'sortby': ['NAME_ASC', 'ID_DESC']},
                   {'data': {'things': [{'id': 2, 'name': 'a'},
@@ -1031,10 +1031,10 @@ def test_sortby_multi_key_ascending(transport, things_config):
 
 
 def test_select_properties_non_id(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection(['name'], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 1, 'offset': 0, 'sortby': ['ID_ASC']},
                   {'data': {'things': [{'id': 7, 'name': 'a'}]}})
     result = p.query(limit=1, select_properties=['name'])
@@ -1054,7 +1054,7 @@ def test_sortby_unsortable_400(config):
 
 
 def test_no_id_sort_warns(transport, things_config, caplog):
-    synthetic(transport, '''
+    serve_sdl_schema(transport, '''
         enum ThingsOrderBy { NAME_ASC NAME_DESC }
         type Query {
           things(first: Int, offset: Int, orderBy: [ThingsOrderBy!]): [Thing]
@@ -1066,7 +1066,7 @@ def test_no_id_sort_warns(transport, things_config, caplog):
 
     assert 'paging order is not guaranteed' in caplog.text
     document = p._document(p._selection([], False)[1], with_sort=False)
-    transport.add(SYNTH_URL, document, {'limit': 10, 'offset': 0},
+    transport.add(SYNTHETIC_URL, document, {'limit': 10, 'offset': 0},
                   {'data': {'things': []}})
     p.query()
 
@@ -1118,10 +1118,10 @@ def test_query_reply_not_list(config, transport):
 
 
 def test_id_missing_500(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=True)
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 1, 'offset': 0, 'sortby': ['ID_ASC']},
                   {'data': {'things': [{'id': None, 'name': 'a'}]}})
 
@@ -1200,13 +1200,13 @@ def test_filter_string(config, transport):
 
 
 def test_filter_typed_cast(transport, things_config):
-    synthetic(transport, FILTER_SDL)
+    serve_sdl_schema(transport, FILTER_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=False,
                            with_filter=True)
     expected = {'id': {'equalTo': -5}, 'score': {'equalTo': 1.5},
                 'ok': {'equalTo': True}, 'mood': {'equalTo': 'HAPPY'}}
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 2, 'offset': 0, 'filter': expected},
                   {'data': {'things': []}})
     p.query(limit=2, properties=[('id', '-5'), ('score', '1.5'),
@@ -1224,7 +1224,7 @@ def test_filter_typed_cast(transport, things_config):
     ('mood', 'ANGRY')
 ])
 def test_filter_invalid_value_400(transport, things_config, prop, value):
-    synthetic(transport, FILTER_SDL)
+    serve_sdl_schema(transport, FILTER_SDL)
     p = GraphQLProvider(things_config)
 
     with pytest.raises(ProviderInvalidQueryError) as err:
@@ -1234,12 +1234,12 @@ def test_filter_invalid_value_400(transport, things_config, prop, value):
 
 
 def test_filter_injection_attempt(transport, things_config):
-    synthetic(transport, FILTER_SDL)
+    serve_sdl_schema(transport, FILTER_SDL)
     p = GraphQLProvider(things_config)
     document = p._document(p._selection([], False)[1], with_sort=False,
                            with_filter=True)
     hostile = '"}) { things { id } } #'
-    transport.add(SYNTH_URL, document,
+    transport.add(SYNTHETIC_URL, document,
                   {'limit': 1, 'offset': 0,
                    'filter': {'name': {'equalTo': hostile}}},
                   {'data': {'things': []}})
@@ -1252,7 +1252,7 @@ def test_filter_injection_attempt(transport, things_config):
 
 @pytest.mark.parametrize('prop', ['label', 'blob', 'tags', 'fuzzy', 'raw'])
 def test_filter_not_filterable_400(transport, things_config, prop):
-    synthetic(transport, FILTER_SDL)
+    serve_sdl_schema(transport, FILTER_SDL)
     p = GraphQLProvider(things_config)
 
     with pytest.raises(ProviderInvalidQueryError) as err:
@@ -1278,7 +1278,7 @@ def test_filter_duplicate_property_400(config):
 
 
 def test_no_filter_argument_400(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
 
     with pytest.raises(ProviderInvalidQueryError) as err:
@@ -1287,7 +1287,7 @@ def test_no_filter_argument_400(transport, things_config):
     assert err.value.user_msg == 'property filters are not supported'
 
 
-def test_bbox_4(config, transport):
+def test_bbox_4_values(config, transport):
     result = GraphQLProvider(config).query(bbox=LISBON_BBOX)
 
     assert result['numberReturned'] > 0
@@ -1300,7 +1300,7 @@ def test_bbox_4(config, transport):
     assert polygon == bbox2geojsongeometry(LISBON_BBOX)
 
 
-def test_bbox_6_reduced(config, transport):
+def test_bbox_6_values_reduced_to_2d(config, transport):
     bbox = [LISBON_BBOX[0], LISBON_BBOX[1], 0,
             LISBON_BBOX[2], LISBON_BBOX[3], 100]
     GraphQLProvider(config).query(bbox=bbox)
@@ -1330,7 +1330,7 @@ def test_bbox_nonfinite_400(config, transport, bad):
 
 
 def test_bbox_not_configured_400(transport, things_config):
-    synthetic(transport, THINGS_SDL)
+    serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
 
     with pytest.raises(ProviderInvalidQueryError) as err:
@@ -1386,7 +1386,7 @@ def test_get_bad_identifier(config, transport):
 
 
 def test_get_id_not_filterable_400(transport, things_config):
-    synthetic(transport, '''
+    serve_sdl_schema(transport, '''
         input StrEq { equalTo: String }
         input ThingFilter { name: StrEq }
         type Query {
