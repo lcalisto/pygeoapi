@@ -51,13 +51,14 @@ from pygeoapi.provider.base import (ProviderConnectionError,
                                     ProviderInvalidQueryError,
                                     ProviderItemNotFoundError,
                                     ProviderQueryError)
-from pygeoapi.provider.graphql_ import GraphQLProvider
+from pygeoapi.provider.graphql_ import DEFAULT_ARGUMENTS, GraphQLProvider
 from pygeoapi.util import bbox2geojsongeometry, yaml_load
 
 from ..util import get_test_file_path, mock_api_request
 
 WOSIS_URL = 'https://wosis.example.org/graphql'
 WORKSHOP_URL = 'https://workshop.example.org/graphql'
+HASURA_URL = 'https://hasura.example.org/graphql'
 SYNTHETIC_URL = 'https://graphql.example.org/graphql'
 INTROSPECTION = get_introspection_query(descriptions=False)
 
@@ -165,7 +166,9 @@ def serve_sdl_schema(transport, sdl, url=SYNTHETIC_URL):
 @pytest.fixture()
 def transport():
     fake = FakeTransport()
-    for url, prefix in ((WOSIS_URL, 'wosis'), (WORKSHOP_URL, 'workshop')):
+    recorded_backends = ((WOSIS_URL, 'wosis'), (WORKSHOP_URL, 'workshop'),
+                         (HASURA_URL, 'hasura'))
+    for url, prefix in recorded_backends:
         path = get_test_file_path(f'data/graphql/{prefix}_schema.json')
         with open(path) as fh:
             fake.add(url, INTROSPECTION, None, json.load(fh))
@@ -252,6 +255,28 @@ def workshop_config():
 
 
 @pytest.fixture()
+def hasura_config():
+    # the workshop parcels served by Hasura, licence MIT
+    # recorded from Hasura v2.45.11 on the workshop database image
+    # details in tests/data/README.md; tests never touch the network
+    return {
+        'name': 'GraphQL',
+        'type': 'feature',
+        'data': HASURA_URL,
+        'id_field': 'id',
+        'title_field': 'name',
+        'graphql': {
+            'collection': 'parcels',
+            'geometry': {'geojson_field': 'geom'},
+            'bbox_filter': {'field': 'geom', 'operator': '_st_intersects'},
+            'arguments': {'limit': 'limit', 'filter': 'where',
+                          'sort': 'order_by'},
+            'equality_operator': '_eq'
+        }
+    }
+
+
+@pytest.fixture()
 def things_config():
     return {
         'name': 'GraphQL',
@@ -315,6 +340,9 @@ def test_defaults(config):
     assert p.geometry_geojson is None
     assert p.bbox_field is None
     assert p.bbox_operator is None
+    assert p.arguments == DEFAULT_ARGUMENTS
+    assert p.arguments is not DEFAULT_ARGUMENTS
+    assert p.equality_operator == 'equalTo'
     assert list(p.fields) == ['profileId', 'profileCode', 'countryName',
                               'longitude', 'latitude']
     assert p.fields['longitude'] == {'type': 'number'}
@@ -461,6 +489,32 @@ def test_headers_invalid(config, headers):
     config['graphql']['headers'] = headers
 
     with pytest.raises(ProviderGenericError, match='headers'):
+        GraphQLProvider(config)
+
+
+def test_headers_malformed_value_not_logged(config, caplog):
+    config['graphql']['headers'] = {'Authorization': 'Bearer secret\n'}
+
+    with caplog.at_level(logging.ERROR):
+        with pytest.raises(ProviderGenericError,
+                           match='headers.Authorization'):
+            GraphQLProvider(config)
+
+    assert 'secret' not in caplog.text
+
+
+@pytest.mark.parametrize('graphql_entries,error', [
+    ({'arguments': 'first'}, 'arguments must be a mapping'),
+    ({'arguments': {'cursor': 'after'}}, 'unknown arguments keys: cursor'),
+    ({'arguments': {'limit': 'first n'}}, 'arguments.limit: invalid name'),
+    ({'arguments': {'offset': 'first'}},
+     'arguments: limit and offset share the name first'),
+    ({'equality_operator': 'equal to'}, 'equality_operator: invalid name')
+])
+def test_arguments_and_operator_invalid(config, graphql_entries, error):
+    config['graphql'].update(graphql_entries)
+
+    with pytest.raises(ProviderGenericError, match=error):
         GraphQLProvider(config)
 
 
@@ -684,8 +738,8 @@ def test_collection_arguments(transport, things_config, arguments, error):
     ('filter', 'filter: ThingFilter!'),
     ('orderBy', 'orderBy: [ThingsOrderBy!]!')
 ])
-def test_filter_and_order_must_be_optional(transport, things_config,
-                                           argument, sdl_arg):
+def test_filter_and_sort_must_be_optional(transport, things_config,
+                                          argument, sdl_arg):
     serve_sdl_schema(transport, f'''
         input IntEq {{ equalTo: Int }}
         input ThingFilter {{ id: IntEq }}
@@ -947,6 +1001,26 @@ def test_geometry_geojson_invalid(transport, things_config):
     assert geometries[3] == {'type': 'Point', 'coordinates': [1.0, 2.0]}
 
 
+def test_geometry_geojson_through_interface(transport, things_config):
+    serve_sdl_schema(transport, '''
+        scalar GeoJSON
+        interface GeometryInterface { geojson: GeoJSON }
+        type GeometryPoint implements GeometryInterface { geojson: GeoJSON }
+        type Query { things(first: Int, offset: Int): [Thing] }
+        type Thing { id: Int geom: GeometryInterface }
+    ''')
+    things_config['graphql']['geometry'] = {'geojson_field': 'geom.geojson'}
+    p = GraphQLProvider(things_config)
+    document = p._document(p._selection([], False)[1], with_sort=False)
+    point = {'type': 'Point', 'coordinates': [1.0, 2.0]}
+    reply = {'data': {'things': [{'id': 1, 'geom': {'geojson': point}}]}}
+    transport.add(SYNTHETIC_URL, document, {'limit': 1, 'offset': 0}, reply)
+    result = p.query(limit=1)
+
+    assert 'geom { geojson }' in ' '.join(document.split())
+    assert result['features'][0]['geometry'] == point
+
+
 def test_id_zero_accepted(transport, things_config):
     serve_sdl_schema(transport, THINGS_SDL)
     p = GraphQLProvider(things_config)
@@ -1071,6 +1145,28 @@ def test_no_id_sort_warns(transport, things_config, caplog):
     p.query()
 
     assert 'sortby' not in data_calls(transport)[-1]
+
+
+def test_sort_shape_unsupported_warns(transport, things_config, caplog):
+    serve_sdl_schema(transport, '''
+        type Query {
+          things(first: Int, offset: Int, orderBy: [String]): [Thing]
+        }
+        type Thing { id: Int name: String }
+    ''')
+    with caplog.at_level(logging.WARNING):
+        p = GraphQLProvider(things_config)
+
+    assert 'sort argument orderBy: unsupported shape' in caplog.text
+    with pytest.raises(ProviderInvalidQueryError) as err:
+        p.query(sortby=[{'property': 'name', 'order': '+'}])
+    assert err.value.user_msg == 'property is not sortable'
+    document = p._document(p._selection([], False)[1], with_sort=False)
+    transport.add(SYNTHETIC_URL, document, {'limit': 10, 'offset': 0},
+                  {'data': {'things': []}})
+    p.query()
+
+    assert '$sortby' not in transport.calls[-1]['payload']['query']
 
 
 @pytest.mark.parametrize('kwargs,error', [
@@ -1409,7 +1505,7 @@ def test_workshop_parcels(workshop_config, transport):
     feature = result['features'][0]
     assert feature['properties'] == {'id': 1, 'name': 'Eduardo VII garden'}
     assert feature['geometry']['type'] == 'MultiPolygon'
-    # exact variables: no filter key, so the strict backend accepted it
+    # exact variables: no filter key, the workshop backend rejects null and {}
     assert data_calls(transport) == [
         {'limit': 10, 'offset': 0, 'sortby': ['ID_ASC']}]
 
@@ -1422,6 +1518,61 @@ def test_workshop_bbox_intersects(workshop_config, transport):
     variables = data_calls(transport)[-1]
     polygon = variables['filter']['geom']['intersects']
     assert polygon == bbox2geojsongeometry(bbox)
+
+
+def test_hasura_parcels(hasura_config, transport):
+    result = GraphQLProvider(hasura_config).query()
+
+    assert [feature['id'] for feature in result['features']] == [1, 2, 3, 4]
+    feature = result['features'][0]
+    assert feature['properties'] == {'id': 1, 'name': 'Eduardo VII garden'}
+    assert feature['geometry']['type'] == 'MultiPolygon'
+    # exact variables: no filter key and the default order in Hasura shape
+    assert data_calls(transport) == [
+        {'limit': 10, 'offset': 0, 'sortby': [{'id': 'asc'}]}]
+    document = transport.calls[-1]['payload']['query']
+    lines = [line.strip() for line in document.splitlines()]
+    assert 'limit: $limit' in lines
+    assert 'offset: $offset' in lines
+    assert 'order_by: $sortby' in lines
+    assert 'first' not in document
+    assert 'orderBy' not in document
+
+
+def test_hasura_sortby(hasura_config, transport):
+    result = GraphQLProvider(hasura_config).query(
+        sortby=[{'property': 'name', 'order': '-'}])
+
+    assert [feature['id'] for feature in result['features']] == [2, 4, 1, 3]
+    assert data_calls(transport) == [
+        {'limit': 10, 'offset': 0,
+         'sortby': [{'name': 'desc'}, {'id': 'asc'}]}]
+
+
+def test_hasura_bbox_and_filter(hasura_config, transport):
+    bbox = [-9.16, 38.72, -9.145, 38.735]
+    result = GraphQLProvider(hasura_config).query(
+        bbox=bbox, properties=[('name', 'Eduardo VII garden')])
+
+    assert [feature['id'] for feature in result['features']] == [1]
+    polygon = bbox2geojsongeometry(bbox)
+    assert data_calls(transport) == [
+        {'limit': 10, 'offset': 0, 'sortby': [{'id': 'asc'}],
+         'filter': {'name': {'_eq': 'Eduardo VII garden'},
+                    'geom': {'_st_intersects': polygon}}}]
+
+
+def test_hasura_get(hasura_config, transport):
+    feature = GraphQLProvider(hasura_config).get('3')
+
+    assert feature['id'] == 3
+    assert feature['properties'] == {'id': 3, 'name': 'Benfica stadium'}
+    payload = transport.calls[-1]['payload']
+    assert payload['variables'] == {
+        'limit': 1, 'offset': 0, 'filter': {'id': {'_eq': 3}}}
+    lines = [line.strip() for line in payload['query'].splitlines()]
+    assert 'where: $filter' in lines
+    assert '$sortby' not in payload['query']
 
 
 def test_api_queryables(graphql_api):

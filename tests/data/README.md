@@ -128,3 +128,12 @@ This directory provides test data to demonstrate functionality.
   - recorded 2026-11-03 from the workshop stack commit 409e6ec (images `db:final-1` and `postgraphile:1`, PostGraphile 4.14.1)
   - `workshop_schema.json`: GraphQL introspection reply reduced to the types the provider tests need (schema structure only)
   - `workshop_interactions.json`: provider requests with replies, holds four workshop parcels (ids, names, geometries)
+
+### `graphql/hasura_*.json`
+- source: GraphQL meets PostGIS workshop by Luis Calisto (parcel geometries from the workshop)
+- URL: https://github.com/lcalisto/workshop-spatial-graphql
+- License: MIT
+- Notes
+  - recorded 2026-11-04 from Hasura GraphQL Engine v2.45.11 running on the workshop database image (`db:final-1`), with the table `app_public.parcels` tracked under the custom name `parcels`
+  - `hasura_schema.json`: GraphQL introspection reply reduced to the types the provider tests need (schema structure only)
+  - `hasura_interactions.json`: provider requests with replies, holds the same four workshop parcels (ids, names, geometries); Hasura returns geometry as GeoJSON with `crs`

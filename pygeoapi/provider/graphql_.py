@@ -37,8 +37,8 @@ import requests
 from graphql import (GraphQLError, build_client_schema,
                      get_introspection_query, get_named_type,
                      get_nullable_type, is_enum_type, is_input_object_type,
-                     is_list_type, is_object_type, is_required_argument,
-                     is_scalar_type)
+                     is_interface_type, is_list_type, is_object_type,
+                     is_required_argument, is_scalar_type)
 
 from pygeoapi.crs import crs_transform
 from pygeoapi.provider.base import (BaseProvider, ProviderConnectionError,
@@ -65,7 +65,13 @@ GEOJSON_TYPES = {'Point', 'MultiPoint', 'LineString', 'MultiLineString',
 GRAPHQL_NAME = re.compile(r'[_A-Za-z][_0-9A-Za-z]*')
 
 GRAPHQL_CONFIG_KEYS = {'collection', 'geometry', 'bbox_filter', 'page_size',
-                       'field_mapping', 'headers', 'timeout'}
+                       'field_mapping', 'headers', 'timeout', 'arguments',
+                       'equality_operator'}
+
+#: Argument name per role, PostGraphile names unless configured
+DEFAULT_ARGUMENTS = {'limit': 'first', 'offset': 'offset', 'filter': 'filter',
+                     'sort': 'orderBy'}
+DEFAULT_EQUALITY_OPERATOR = 'equalTo'
 
 #: GraphQL scalar name to JSON Schema; anything else is a string
 TYPE_MAP = {
@@ -144,6 +150,7 @@ def _cast_value(value, type_):
             raise ValueError(text)
         return text
     if type_.name == 'Int':
+        # int() alone would take '+5', ' 5' and '1_0'
         if not re.fullmatch(r'-?[0-9]+', text):
             raise ValueError(text)
         number = int(text)
@@ -182,10 +189,11 @@ def _post_graphql(session, url, headers, timeout, document, variables=None):
         payload['variables'] = variables
 
     try:
+        # requests may turn a redirected POST into a GET, dropping the body
         response = session.post(url, json=payload, headers=headers,
                                 timeout=timeout, allow_redirects=False)
     except requests.RequestException as err:
-        msg = f'Transport error: {err}'
+        msg = f'Transport error with {url}: {err}'
         LOGGER.error(msg)
         raise ProviderConnectionError(msg)
 
@@ -197,23 +205,24 @@ def _post_graphql(session, url, headers, timeout, document, variables=None):
     try:
         body = response.json()
     except ValueError:
-        msg = f'Non-JSON reply from {url}'
+        msg = f'Non-JSON reply (status {response.status_code}) from {url}'
         LOGGER.error(msg)
         raise ProviderConnectionError(msg)
 
+    # before the status check: validation errors can come with HTTP 400
     if isinstance(body, dict) and body.get('errors'):
         msg = f"GraphQL errors from {url}: {body['errors']}"
         LOGGER.error(msg)
         raise ProviderQueryError(msg)
 
     if response.status_code != 200:
-        msg = f'Status {response.status_code} from {url}'
+        msg = f'HTTP status {response.status_code} from {url}'
         LOGGER.error(msg)
         raise ProviderConnectionError(msg)
 
     data = body.get('data') if isinstance(body, dict) else None
     if not isinstance(data, dict):
-        msg = f'Unexpected reply shape from {url}'
+        msg = f'Unexpected reply shape from {url}: no data object'
         LOGGER.error(msg)
         raise ProviderQueryError(msg)
 
@@ -223,7 +232,7 @@ def _post_graphql(session, url, headers, timeout, document, variables=None):
 @functools.cache
 def _introspect_schema(url, header_items, timeout):
     """
-    Introspect a GraphQL endpoint, cached per worker
+    Introspect a GraphQL endpoint, cached per process
 
     :param url: endpoint URL
     :param header_items: tuple of sorted HTTP header items
@@ -263,14 +272,14 @@ def _field_schema(type_):
     return dict(TYPE_MAP.get(named.name, {'type': 'string'}))
 
 
-def _order_map(mapping, order_type):
+def _sort_map_from_enum(property_paths, enum_type):
     """
-    Map property names to orderBy enum value pairs by normalised name
+    Map property names to sort enum value pairs by normalised name
 
-    Keys come from the mapped GraphQL field; dotted paths are not sortable
+    Matched on the mapped GraphQL field; dotted paths are not sortable
 
-    :param mapping: property mapping
-    :param order_type: orderBy GraphQL enum type
+    :param property_paths: property mapping
+    :param enum_type: GraphQL enum type of the sort argument
 
     :returns: dict of property name to (asc, desc) enum values
     """
@@ -278,7 +287,7 @@ def _order_map(mapping, order_type):
     asc = {}
     desc = {}
     ambiguous = set()
-    for name in order_type.values:
+    for name in enum_type.values:
         if name.endswith('_ASC'):
             key = name[:-4].replace('_', '').lower()
             if key in asc:
@@ -291,7 +300,7 @@ def _order_map(mapping, order_type):
             desc[key] = name
 
     pairs = {}
-    for prop, (path, _) in mapping.items():
+    for prop, (path, _) in property_paths.items():
         if len(path) != 1:
             continue
         key = path[0].replace('_', '').lower()
@@ -299,6 +308,38 @@ def _order_map(mapping, order_type):
             continue
         if key in asc and key in desc:
             pairs[prop] = (asc[key], desc[key])
+
+    return pairs
+
+
+def _sort_map_from_input_object(property_paths, input_type):
+    """
+    Map property names to sort input object pairs by GraphQL field name
+
+    A field is sortable when its enum has asc and desc values, case ignored
+
+    :param property_paths: property mapping
+    :param input_type: GraphQL input object type of the sort argument
+
+    :returns: dict of property name to (asc, desc) one-key dicts
+    """
+
+    pairs = {}
+    for prop, (path, _) in property_paths.items():
+        if len(path) != 1:
+            continue
+        field_name = path[0]
+        field = input_type.fields.get(field_name)
+        if field is None:
+            continue
+        direction_type = get_named_type(field.type)
+        if not is_enum_type(direction_type):
+            continue
+        # whole names, case ignored, so asc_nulls_first is never taken for asc
+        values = {value.lower(): value for value in direction_type.values}
+        if 'asc' in values and 'desc' in values:
+            pairs[prop] = ({field_name: values['asc']},
+                           {field_name: values['desc']})
 
     return pairs
 
@@ -414,7 +455,7 @@ class GraphQLProvider(BaseProvider):
 
         unknown = sorted(map(str, set(graphql) - GRAPHQL_CONFIG_KEYS))
         if unknown:
-            _config_error(f"unknown keys: {', '.join(unknown)}")
+            _config_error(f"unknown graphql keys: {', '.join(unknown)}")
 
         if 'collection' not in graphql:
             _config_error('collection is required')
@@ -422,6 +463,10 @@ class GraphQLProvider(BaseProvider):
         self.collection = _valid_name(graphql['collection'], 'collection')
         self._parse_geometry(graphql.get('geometry'))
         self._parse_bbox_filter(graphql.get('bbox_filter'))
+        self._parse_arguments(graphql.get('arguments'))
+        self.equality_operator = _valid_name(
+            graphql.get('equality_operator', DEFAULT_EQUALITY_OPERATOR),
+            'equality_operator')
         self._parse_field_mapping(graphql.get('field_mapping'))
         self._parse_headers(graphql.get('headers'))
         self.page_size = _positive_int(
@@ -480,6 +525,35 @@ class GraphQLProvider(BaseProvider):
         self.bbox_operator = _valid_name(
             bbox_filter['operator'], 'bbox_filter.operator')
 
+    def _parse_arguments(self, arguments):
+        """
+        Validate the graphql.arguments block, merged over the defaults
+
+        :param arguments: arguments configuration
+        """
+
+        self.arguments = dict(DEFAULT_ARGUMENTS)
+
+        if arguments is None:
+            return
+        if not isinstance(arguments, dict):
+            _config_error('arguments must be a mapping')
+
+        unknown = sorted(map(str, set(arguments) - set(DEFAULT_ARGUMENTS)))
+        if unknown:
+            _config_error(f"unknown arguments keys: {', '.join(unknown)}")
+
+        for role, name in arguments.items():
+            self.arguments[role] = _valid_name(name, f'arguments.{role}')
+
+        # a shared name would only fail upstream, at the first request
+        role_by_name = {}
+        for role, name in self.arguments.items():
+            if name in role_by_name:
+                _config_error(f'arguments: {role_by_name[name]} and {role} '
+                              f'share the name {name}')
+            role_by_name[name] = role
+
     def _parse_field_mapping(self, field_mapping):
         """
         Validate the graphql.field_mapping block
@@ -518,6 +592,11 @@ class GraphQLProvider(BaseProvider):
             if (not isinstance(key, str) or value is None
                     or isinstance(value, (dict, list))):
                 _config_error('headers must map names to scalar values')
+            try:
+                requests.utils.check_header_validity((key, str(value)))
+            except requests.exceptions.InvalidHeader:
+                # the requests message would carry the value
+                _config_error(f'headers.{key}: invalid header name or value')
             self.headers[key] = str(value)
 
     def _resolve_schema(self):
@@ -542,7 +621,7 @@ class GraphQLProvider(BaseProvider):
 
     def _resolve_node_type(self, collection_field):
         """
-        Node object type of the collection field (list shape)
+        Object type of the nodes listed by the collection field
 
         :param collection_field: field on the query type
 
@@ -568,28 +647,42 @@ class GraphQLProvider(BaseProvider):
         :returns: filter input type, or None
         """
 
-        for name in ('first', 'offset'):
+        limit_name = self.arguments['limit']
+        offset_name = self.arguments['offset']
+        filter_name = self.arguments['filter']
+        sort_name = self.arguments['sort']
+
+        paging_names = (limit_name, offset_name)
+        for name in paging_names:
             if name not in collection_field.args:
                 _config_error(f'collection has no {name} argument')
-        self._limit_variable_type = str(collection_field.args['first'].type)
-        self._offset_variable_type = str(collection_field.args['offset'].type)
+        limit_arg = collection_field.args[limit_name]
+        offset_arg = collection_field.args[offset_name]
+        self._limit_variable_type = str(limit_arg.type)
+        self._offset_variable_type = str(offset_arg.type)
 
         for name, arg in collection_field.args.items():
-            if name in ('filter', 'orderBy'):
+            if name in (filter_name, sort_name):
                 if is_required_argument(arg):
                     _config_error(f'argument {name} must be optional')
-            elif name not in ('first', 'offset') and is_required_argument(arg):
+            elif name not in paging_names and is_required_argument(arg):
                 _config_error(f'required argument {name} not supported')
 
         self._filter_variable_type = None
-        if 'filter' in collection_field.args:
-            filter_arg = collection_field.args['filter']
-            filter_type = get_named_type(filter_arg.type)
-            if is_input_object_type(filter_type):
-                self._filter_variable_type = str(filter_arg.type)
-                return filter_type
+        filter_arg = collection_field.args.get(filter_name)
+        if filter_arg is None:
+            LOGGER.warning(f'collection has no {filter_name} argument: '
+                           'filters and item lookup are not available')
+            return None
 
-        return None
+        filter_type = get_named_type(filter_arg.type)
+        if not is_input_object_type(filter_type):
+            LOGGER.warning(f'filter argument {filter_name} is not an input '
+                           'object: filters and item lookup are not available')
+            return None
+
+        self._filter_variable_type = str(filter_arg.type)
+        return filter_type
 
     def _map_fields(self):
         """
@@ -622,15 +715,15 @@ class GraphQLProvider(BaseProvider):
             mapping = {p: mapping[p] for p in self.properties}
 
         if self.id_field not in mapping:
-            _config_error(f'id_field {self.id_field} is not exposed')
+            _config_error(f'id_field {self.id_field} is not a property')
         if self.title_field and self.title_field not in mapping:
-            _config_error(f'title_field {self.title_field} is not exposed')
+            _config_error(f'title_field {self.title_field} is not a property')
 
         return mapping
 
     def _resolve_path(self, path, key):
         """
-        Resolve a dotted path to a scalar leaf on the node type
+        Resolve a dotted path to a scalar or enum leaf on the node type
 
         :param path: dotted GraphQL path
         :param key: configuration key, for the error message
@@ -642,7 +735,7 @@ class GraphQLProvider(BaseProvider):
         type_ = self._node_type
         leaf = None
         for depth, part in enumerate(parts):
-            if not is_object_type(type_):
+            if not (is_object_type(type_) or is_interface_type(type_)):
                 _config_error(f'{key}: {path} is not reachable')
             field = type_.fields.get(part)
             if field is None:
@@ -653,7 +746,7 @@ class GraphQLProvider(BaseProvider):
             leaf = field.type
             nullable = get_nullable_type(leaf)
             if is_list_type(nullable) and depth < len(parts) - 1:
-                _config_error(f'{key}: {part} is a list')
+                _config_error(f'{key}: field {part} is a list')
             type_ = get_named_type(leaf)
 
         if not (is_scalar_type(type_) or is_enum_type(type_)):
@@ -694,7 +787,7 @@ class GraphQLProvider(BaseProvider):
 
     def _build_sorting(self, collection_field):
         """
-        Build the sort map from the orderBy enum
+        Build the sort map from the sort argument
 
         :param collection_field: field on the query type
         """
@@ -702,16 +795,25 @@ class GraphQLProvider(BaseProvider):
         self._sort_map = {}
         self._sort_variable_type = None
 
-        if 'orderBy' in collection_field.args:
-            sort_arg = collection_field.args['orderBy']
+        sort_name = self.arguments['sort']
+        sort_arg = collection_field.args.get(sort_name)
+        if sort_arg is not None:
             arg_type = get_nullable_type(sort_arg.type)
-            order_type = get_named_type(arg_type)
-            if is_list_type(arg_type) and is_enum_type(order_type):
+            sort_type = get_named_type(arg_type)
+            sort_map_from = None
+            if is_list_type(arg_type) and is_enum_type(sort_type):
+                sort_map_from = _sort_map_from_enum
+            elif is_list_type(arg_type) and is_input_object_type(sort_type):
+                sort_map_from = _sort_map_from_input_object
+            if sort_map_from is None:
+                LOGGER.warning(f'sort argument {sort_name}: unsupported '
+                               'shape, sortby is not available')
+            else:
+                self._sort_map = sort_map_from(self._property_paths, sort_type)
                 self._sort_variable_type = str(sort_arg.type)
-                self._sort_map = _order_map(self._property_paths, order_type)
 
         if self.id_field not in self._sort_map:
-            LOGGER.warning(f'no orderBy value for {self.id_field}: '
+            LOGGER.warning(f'no sort value for {self.id_field}: '
                            'paging order is not guaranteed')
 
     def _build_filtering(self):
@@ -736,8 +838,12 @@ class GraphQLProvider(BaseProvider):
             operators = get_named_type(field.type)
             if not is_input_object_type(operators):
                 continue
-            if 'equalTo' in operators.fields:
+            if self.equality_operator in operators.fields:
                 self._filter_map[prop] = (path[0], named)
+
+        if not self._filter_map:
+            LOGGER.warning('no property is filterable with '
+                           f'{self.equality_operator}')
 
     def _make_filter(self, properties, bbox):
         """
@@ -766,12 +872,13 @@ class GraphQLProvider(BaseProvider):
             if field in conditions:
                 _raise_invalid('duplicate property filter')
             try:
-                conditions[field] = {'equalTo': _cast_value(value, type_)}
+                typed_value = _cast_value(value, type_)
             except ValueError:
                 msg = f'invalid value for property {prop}'
                 LOGGER.error(msg)
                 raise ProviderInvalidQueryError(
                     user_msg='invalid property filter value')
+            conditions[field] = {self.equality_operator: typed_value}
         if bbox:
             conditions.update(self._bbox_condition(bbox))
 
@@ -830,7 +937,7 @@ class GraphQLProvider(BaseProvider):
         Build the GraphQL document, one variable and argument per line
 
         :param paths: field paths to select
-        :param with_sort: include the orderBy variable
+        :param with_sort: include the sort variable
         :param with_filter: include the filter variable
 
         :returns: str of GraphQL document
@@ -838,13 +945,14 @@ class GraphQLProvider(BaseProvider):
 
         variables = [f'$limit: {self._limit_variable_type}',
                      f'$offset: {self._offset_variable_type}']
-        arguments = ['first: $limit', 'offset: $offset']
+        arguments = [f"{self.arguments['limit']}: $limit",
+                     f"{self.arguments['offset']}: $offset"]
         if with_filter:
             variables.append(f'$filter: {self._filter_variable_type}')
-            arguments.append('filter: $filter')
+            arguments.append(f"{self.arguments['filter']}: $filter")
         if with_sort:
             variables.append(f'$sortby: {self._sort_variable_type}')
-            arguments.append('orderBy: $sortby')
+            arguments.append(f"{self.arguments['sort']}: $sortby")
 
         tree = {}
         for path in paths:
@@ -864,11 +972,11 @@ class GraphQLProvider(BaseProvider):
 
     def _make_orderby(self, sortby):
         """
-        Map client sortby to orderBy enum values, id as tiebreaker
+        Map client sortby to sort argument values, id as tiebreaker
 
         :param sortby: list of dicts (property, order)
 
-        :returns: list of orderBy enum values
+        :returns: list of sort argument values
         """
 
         order = []
@@ -904,7 +1012,8 @@ class GraphQLProvider(BaseProvider):
                              self.timeout, document, variables)
         nodes = data.get(self.collection)
         if not isinstance(nodes, list):
-            msg = f'Unexpected reply shape from {self.data}'
+            msg = (f'Unexpected reply shape from {self.data}: '
+                   f'{self.collection} is not a list')
             LOGGER.error(msg)
             raise ProviderQueryError(msg)
 
@@ -1075,7 +1184,7 @@ class GraphQLProvider(BaseProvider):
         props, paths = self._selection([], False)
         document = self._document(paths, with_sort=False, with_filter=True)
         variables = {'limit': 1, 'offset': 0,
-                     'filter': {field: {'equalTo': value}}}
+                     'filter': {field: {self.equality_operator: value}}}
         nodes = self._post(document, variables)
         if not nodes:
             msg = f'item {identifier} not found'
