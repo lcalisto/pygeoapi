@@ -119,3 +119,12 @@ This directory provides test data to demonstrate functionality.
 - Notes
   - `wosis_schema.json`: GraphQL introspection reply recorded 2026-10-13, reduced to the types the provider tests need (schema structure only, it holds no soil data)
   - `wosis_interactions.json`: provider requests with replies recorded 2026-10-14; holds a few `wosis_latest` profile records (ids, codes, country names, coordinates)
+
+### `graphql/workshop_*.json`
+- source: GraphQL meets PostGIS workshop by Luis Calisto (parcel geometries from the workshop)
+- URL: https://github.com/lcalisto/workshop-spatial-graphql
+- License: MIT
+- Notes:
+  - recorded 2026-11-03 from the workshop stack commit 409e6ec (images `db:final-1` and `postgraphile:1`, PostGraphile 4.14.1)
+  - `workshop_schema.json`: GraphQL introspection reply reduced to the types the provider tests need (schema structure only)
+  - `workshop_interactions.json`: provider requests with replies, holds four workshop parcels (ids, names, geometries)

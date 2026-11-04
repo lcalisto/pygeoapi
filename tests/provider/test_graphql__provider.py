@@ -57,6 +57,7 @@ from pygeoapi.util import bbox2geojsongeometry, yaml_load
 from ..util import get_test_file_path, mock_api_request
 
 WOSIS_URL = 'https://wosis.example.org/graphql'
+WORKSHOP_URL = 'https://workshop.example.org/graphql'
 SYNTH_URL = 'https://graphql.example.org/graphql'
 INTROSPECTION = get_introspection_query(descriptions=False)
 
@@ -164,14 +165,16 @@ def synthetic(transport, sdl, url=SYNTH_URL):
 @pytest.fixture()
 def transport():
     fake = FakeTransport()
-    with open(get_test_file_path('data/graphql/wosis_schema.json')) as fh:
-        fake.add(WOSIS_URL, INTROSPECTION, None, json.load(fh))
-    path = get_test_file_path('data/graphql/wosis_interactions.json')
-    with open(path) as fh:
-        for interaction in json.load(fh):
-            fake.add(WOSIS_URL, interaction['document'],
-                     interaction['variables'], interaction['body'],
-                     interaction['status'])
+    for url, prefix in ((WOSIS_URL, 'wosis'), (WORKSHOP_URL, 'workshop')):
+        path = get_test_file_path(f'data/graphql/{prefix}_schema.json')
+        with open(path) as fh:
+            fake.add(url, INTROSPECTION, None, json.load(fh))
+        path = get_test_file_path(f'data/graphql/{prefix}_interactions.json')
+        with open(path) as fh:
+            for interaction in json.load(fh):
+                fake.add(url, interaction['document'],
+                         interaction['variables'], interaction['body'],
+                         interaction['status'])
     return fake
 
 
@@ -205,10 +208,9 @@ def offline(transport):
 
 @pytest.fixture()
 def config():
-    # WoSIS, ISRIC World Soil Information
-    # schema and interactions recorded from
-    # https://graphql.isric.org/wosis/graphql (CC BY 4.0, see
-    # tests/data/README.md); tests never touch the network
+    # WoSIS, ISRIC World Soil Information, licence CC BY 4.0
+    # recorded from https://graphql.isric.org/wosis/graphql
+    # details in tests/data/README.md; tests never touch the network
     return {
         'name': 'GraphQL',
         'type': 'feature',
@@ -226,6 +228,25 @@ def config():
                 'operator': 'bboxIntersects2D'
             },
             'page_size': 100
+        }
+    }
+
+
+@pytest.fixture()
+def workshop_config():
+    # parcels authored for the workshop, licence MIT
+    # recorded from the lcalisto/workshop-spatial-graphql final stack
+    # details in tests/data/README.md; tests never touch the network
+    return {
+        'name': 'GraphQL',
+        'type': 'feature',
+        'data': WORKSHOP_URL,
+        'id_field': 'id',
+        'title_field': 'name',
+        'graphql': {
+            'collection': 'parcelsList',
+            'geometry': {'geojson_field': 'geom.geojson'},
+            'bbox_filter': {'field': 'geom', 'operator': 'intersects'}
         }
     }
 
@@ -1379,6 +1400,28 @@ def test_get_id_not_filterable_400(transport, things_config):
         p.get(1)
 
     assert err.value.user_msg == 'item lookup is not supported'
+
+
+def test_workshop_parcels(workshop_config, transport):
+    result = GraphQLProvider(workshop_config).query()
+
+    assert [feature['id'] for feature in result['features']] == [1, 2, 3, 4]
+    feature = result['features'][0]
+    assert feature['properties'] == {'id': 1, 'name': 'Eduardo VII garden'}
+    assert feature['geometry']['type'] == 'MultiPolygon'
+    # exact variables: no filter key, so the strict backend accepted it
+    assert data_calls(transport) == [
+        {'limit': 10, 'offset': 0, 'sortby': ['ID_ASC']}]
+
+
+def test_workshop_bbox_intersects(workshop_config, transport):
+    bbox = [-9.16, 38.72, -9.145, 38.735]
+    result = GraphQLProvider(workshop_config).query(bbox=bbox)
+
+    assert [feature['id'] for feature in result['features']] == [1]
+    variables = data_calls(transport)[-1]
+    polygon = variables['filter']['geom']['intersects']
+    assert polygon == bbox2geojsongeometry(bbox)
 
 
 def test_api_queryables(graphql_api):
