@@ -24,6 +24,7 @@ parameters.
    `ERDDAP Tabledap Service`_,❌/❌,❌/❌,✅,✅,❌,❌,❌,❌,❌,✅
    `ESRI Feature Service`_,✅/✅,✅/✅,✅,✅,✅,✅,❌,❌,❌,✅
    `GeoJSON`_,✅/✅,✅/✅,✅,❌,❌,✅,❌,❌,❌,✅
+   `GraphQL`_,✅/✅,❌/❌,✅,❌,✅,✅,❌,❌,❌,✅
    `MongoDB`_,✅/❌,✅/✅,✅,✅,✅,✅,❌,❌,❌,✅
    `MySQL`_,✅/✅,✅/✅,✅,✅,✅,✅,❌,✅,✅,✅
    `OGR`_,✅/❌,✅/❌,✅,❌,❌,✅,❌,❌,❌,✅
@@ -197,6 +198,103 @@ To publish a GeoJSON file, the file must be a valid GeoJSON FeatureCollection.
          name: GeoJSON
          data: tests/data/file.json
          id_field: id
+
+GraphQL
+^^^^^^^
+
+.. note::
+   Requires Python package `graphql-core`_
+
+This provider publishes one root query field of a GraphQL API as a feature collection. That field must return a list of objects, not a page or connection object. The provider expects one convention for paging, filtering and sorting, because the GraphQL specification defines none: the root field has a limit and an offset argument, an optional filter argument that takes ``{field: {operator: value}}`` and an optional sort argument. The argument names and the equality operator are configurable. The defaults are the `PostGraphile <https://www.graphile.org/postgraphile/>`_ names with the `connection-filter plugin <https://github.com/graphile-contrib/postgraphile-plugin-connection-filter>`_: ``first``, ``offset``, ``filter``, ``orderBy`` and ``equalTo``. The provider has been tested with PostGraphile 4 and `Hasura 2 <https://hasura.io/>`_. A PostGraphile server needs its ``simpleCollections`` option set to ``only`` or ``both``, because by default it serves only connection fields.
+
+The endpoint must accept HTTP POST and allow introspection with the headers in ``graphql.headers``. pygeoapi reads the schema by introspection once per process, so after a schema change on the GraphQL server, restart pygeoapi. Client values travel only as GraphQL variables.
+
+To publish the soil profiles of `WoSIS <https://www.isric.org/explore/wosis>`_, a PostGraphile API:
+
+.. code-block:: yaml
+
+   providers:
+       - type: feature
+         name: GraphQL
+         data: https://graphql.isric.org/wosis/graphql
+         id_field: profileId
+         title_field: profileCode
+         graphql:
+             collection: wosisLatestProfiles
+             geometry:
+                 x_field: longitude
+                 y_field: latitude
+             bbox_filter:
+                 field: geom
+                 operator: bboxIntersects2D
+             page_size: 100  # optional, default 100
+
+The names are written by the user manually, from the GraphiQL or the schema of the server. pygeoapi checks them against that schema when it loads the provider. A wrong name makes ``pygeoapi openapi generate`` fail and every request for the items answer HTTP 500, with the name in the pygeoapi log. Three names only log a warning instead: the sort argument, the filter argument when ``bbox_filter`` is not set, and the equality operator when no field offers it. Without the sort argument, ``sortby`` answers HTTP 400. Without either of the other two, property filters and item lookup answer HTTP 400.
+
+* ``data`` is the URL of the GraphQL endpoint.
+* ``id_field`` is required and ``title_field`` is optional. Both name properties, so under ``field_mapping`` they are its keys, and a ``properties`` list has to include them. ``properties`` also limits what is requested from the server.
+* ``graphql.collection`` is required and names the root query field that returns the list of objects.
+* ``graphql.geometry`` takes ``x_field`` and ``y_field`` for a point from two numeric fields, or ``geojson_field`` for a field that returns a GeoJSON geometry. A Feature, a string with GeoJSON in it, or any other value gives a null geometry and no error. Dotted paths reach nested fields (``geom.geojson``). Leave it out for a collection without geometry.
+* ``graphql.bbox_filter`` names the field and operator of the filter type that take a GeoJSON polygon, like ``bboxIntersects2D`` and ``intersects`` from the `PostGIS filter plugin <https://github.com/graphile-contrib/postgraphile-plugin-connection-filter-postgis>`_ of PostGraphile, or ``_st_intersects`` in Hasura. Without it a ``bbox`` query answers HTTP 400.
+* ``graphql.arguments`` maps the roles ``limit``, ``offset``, ``filter`` and ``sort`` to the argument names of the root field (defaults ``first``, ``offset``, ``filter`` and ``orderBy``). A partial block keeps the defaults for the roles it leaves out. Two roles cannot share a name.
+* ``graphql.equality_operator`` (default ``equalTo``) is the operator of the filter type used for property filters and item lookup, ``_eq`` in Hasura.
+* ``graphql.page_size`` (default 100) is the maximum number of items per request to the server. Keep it at or below the server limit: a reply shorter than requested is taken as the end of the data, so a server that cuts silently loses items with no error. A client ``limit`` above it means several requests in a row.
+* ``graphql.field_mapping`` maps property names to GraphQL fields. Dotted paths reach nested to-one fields. Without it every field of the objects that is a scalar, an enum or a list of them becomes a property, minus the geometry fields and fields with required arguments.
+* ``graphql.headers`` adds HTTP headers to every request, for example an ``Authorization`` header with a token from an environment variable. Values are never logged; a malformed value is a configuration error.
+* ``graphql.timeout`` (default 30) is the request timeout in seconds.
+
+Property filters use the equality operator on top-level fields of type ``Int``, ``Float``, ``Boolean``, ``String``, ``ID`` or enum, not on lists of them. A value that does not fit the field type answers HTTP 400. ``sortby`` uses the sort argument, which can be a list of an enum with ``_ASC`` and ``_DESC`` values (PostGraphile) or a list of input objects whose fields take an enum with ``asc`` and ``desc`` values (Hasura). Without ``sortby`` the order is by id ascending, if the id is sortable. With ``sortby`` the id is added ascending as the last key, unless the client already sorts on it.
+
+Another PostGraphile example is the stack of the `GraphQL meets PostGIS workshop <https://github.com/lcalisto/workshop-spatial-graphql>`_. From a clone of that repository, ``docker compose -f compose/final.yml up -d`` starts it:
+
+.. code-block:: yaml
+
+   providers:
+       - type: feature
+         name: GraphQL
+         data: http://localhost:5002/graphql
+         id_field: id
+         title_field: name
+         graphql:
+             collection: parcelsList
+             geometry:
+                 geojson_field: geom.geojson
+             bbox_filter:
+                 field: geom
+                 operator: intersects
+
+Hasura is here only as another example, the workshop does not include it. A Hasura on the workshop database, with the table ``app_public.parcels`` tracked under the custom name ``parcels``, needs the Hasura names and gets its geometry straight from the ``geom`` field:
+
+.. code-block:: yaml
+
+   providers:
+       - type: feature
+         name: GraphQL
+         data: http://localhost:8080/v1/graphql
+         id_field: id
+         title_field: name
+         graphql:
+             collection: parcels
+             geometry:
+                 geojson_field: geom
+             bbox_filter:
+                 field: geom
+                 operator: _st_intersects
+             arguments:
+                 limit: limit
+                 filter: where
+                 sort: order_by
+             equality_operator: _eq
+
+Limitations:
+
+* the endpoint must answer when the OpenAPI document is generated, or ``pygeoapi openapi generate`` fails and the Docker container exits at start; a request that finds it down fails, the next one tries again
+* a server whose paging is not two top-level arguments, or whose root field has another required argument, is not supported
+* read only: ``editable: true`` and ``time_field`` are configuration errors; ``datetime``, ``q``, CQL and ``resulttype=hits`` answer HTTP 400; ``numberMatched`` is not returned
+* property filters are equality only, on the types listed above, so not on custom scalars such as ``BigInt`` and ``UUID`` in PostGraphile or ``bigint``, ``uuid`` and ``numeric`` in Hasura; queryables list every property, filterable or not
+* item lookup needs a filterable id, so an id of another type answers HTTP 400; sorting needs a sort argument of one of the two shapes above, or ``sortby`` answers HTTP 400; without a sort value for the id the paging order is not guaranteed
+* bbox needs a filter operator that takes a GeoJSON polygon; a box crossing the antimeridian answers HTTP 400
+* nested to-one fields are display only; lists of objects are not exposed
 
 MongoDB
 ^^^^^^^
@@ -1034,3 +1132,4 @@ Data access examples
 .. _`sodapy`: https://github.com/xmunoz/sodapy
 .. _`Tabledap`: https://coastwatch.pfeg.noaa.gov/erddap/tabledap/documentation.html
 .. _`requests`: https://requests.readthedocs.io
+.. _`graphql-core`: https://github.com/graphql-python/graphql-core
